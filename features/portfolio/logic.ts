@@ -98,11 +98,24 @@ export function computeAssetPosition(
   // ── Live override: a fresh market quote replaces the last-trade price ──
   // Only applies if the asset actually has a position — a live price for
   // a closed/never-opened position has nothing to mark to market.
-  const livePrice = livePrices?.get(asset.ticker)
-  const isLivePrice = livePrice !== undefined && totalBuyQty > 0
-  if (isLivePrice) {
-    currentPrice = livePrice as number
-  }
+  const isInitialSnapshotOnly =
+  txns.length === 1 &&
+  txns[0]?.type === 'buy' &&
+  (
+    txns[0]?.note === 'Startbestand' ||
+    txns[0]?.note === 'Startbestand beim Asset-Anlegen'
+  )
+
+const livePrice = livePrices?.get(asset.ticker)
+
+const isLivePrice =
+  livePrice !== undefined &&
+  totalBuyQty > 0 &&
+  !isInitialSnapshotOnly
+
+if (isLivePrice) {
+  currentPrice = livePrice as number
+}
 
   // ── Position Size: SUM(buys) − SUM(sells), never negative ──
   const quantity = Math.max(totalBuyQty - totalSellQty, 0)
