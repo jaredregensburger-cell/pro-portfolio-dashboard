@@ -169,7 +169,7 @@ export function AddTransactionModal() {
       open={isOpen}
       onClose={handleClose}
       title="Transaktion erfassen"
-      description="Gib Betrag, Menge, Datum und Uhrzeit ein — der Kurs wird automatisch berechnet."
+      description="Gib Betrag und Menge ein — der Kurs wird automatisch berechnet."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
