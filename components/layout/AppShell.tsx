@@ -10,6 +10,7 @@ import { AddTransactionModal } from '@/features/transactions/AddTransactionModal
 import { AddPortfolioModal } from '@/features/portfolio/AddPortfolioModal'
 import { AddWatchlistItemModal } from '@/features/watchlist/AddWatchlistItemModal'
 import { LiveMarketDataProvider } from '@/features/portfolio/LiveMarketDataProvider'
+import { OnboardingGate } from '@/features/onboarding/OnboardingGate'
 import { ToastContainer } from '@/components/ui'
 import { ChatBubble } from '@/components/ai-chat'
 
@@ -25,7 +26,7 @@ export function AppShell({ children, title, subtitle, topbarActions }: AppShellP
   const isCollapsed = sidebar === 'collapsed'
 
   return (
-    <AuthGate>
+    <OnboardingGate>
       <LiveMarketDataProvider>
         <div className="min-h-screen bg-void">
           <Sidebar />
@@ -53,6 +54,6 @@ export function AppShell({ children, title, subtitle, topbarActions }: AppShellP
           <ChatBubble />
         </div>
       </LiveMarketDataProvider>
-    </AuthGate>
+    </OnboardingGate>
   )
 }
