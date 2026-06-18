@@ -23,6 +23,8 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
   const email = useUIStore((s) => s.email)
   const [userOpen, setUserOpen] = useState(false)
 
+  const firstName = displayName?.trim()?.split(' ')[0] || 'Investor'
+
   return (
     <header className="relative flex h-topbar items-center justify-between gap-3 px-4 sm:px-6 border-b border-border bg-surface/80 backdrop-blur-glass shrink-0">
       <div className="flex items-center gap-3 min-w-0">
@@ -35,9 +37,13 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
         </button>
 
         <div className="min-w-0">
-          <h1 className="text-data-base sm:text-data-lg font-semibold text-ink truncate">{title}</h1>
+          <h1 className="text-data-base sm:text-data-lg font-semibold text-ink truncate">
+            {title}
+          </h1>
           {subtitle && (
-            <p className="text-data-sm text-ink-muted truncate hidden sm:block">{subtitle}</p>
+            <p className="text-data-sm text-ink-muted truncate hidden sm:block">
+              {title === 'Dashboard' ? `Good morning, ${firstName}` : subtitle}
+            </p>
           )}
         </div>
       </div>
@@ -85,12 +91,12 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
                 'bg-signal-gradient text-white'
               )}
             >
-              {initials(displayName)}
+              {initials(displayName || 'Investor')}
             </div>
 
             <div className="hidden md:block text-left">
               <p className="text-data-sm font-medium text-ink leading-none">
-                {displayName}
+                {displayName || 'Investor'}
               </p>
             </div>
 
@@ -106,8 +112,12 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
           {userOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-surface-elevated shadow-glass-lg overflow-hidden z-50">
               <div className="px-3 py-3 border-b border-border">
-                <p className="text-data-sm font-semibold text-ink truncate">{displayName}</p>
-                <p className="text-data-xs text-ink-faint truncate">{email}</p>
+                <p className="text-data-sm font-semibold text-ink truncate">
+                  {displayName || 'Investor'}
+                </p>
+                <p className="text-data-xs text-ink-faint truncate">
+                  {email || 'Keine E-Mail'}
+                </p>
               </div>
 
               <Link
@@ -133,7 +143,8 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
               <button
                 onClick={() => {
                   setUserOpen(false)
-                  showInfoToast('Logout', 'Logout ist noch nicht verbunden.')
+                  localStorage.removeItem('folio-demo-user')
+                  showInfoToast('Logout', 'Du wurdest lokal ausgeloggt.')
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
               >
