@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui'
-import { useOnboardingStore, useSimulationStore } from '@/store'
+import { useOnboardingStore, useSimulationStore, useUIStore } from '@/store'
 import { OnboardingOptionCard } from './OnboardingOptionCard'
 import { OnboardingProgress } from './OnboardingProgress'
 import type { InvestorType, InvestorProfile } from '@/types/simulation'
 import { ArrowLeft, ArrowRight, Zap, Sparkles } from 'lucide-react'
 
-const STEPS = ['investorType', 'primaryGoal', 'experienceLevel'] as const
+const STEPS = ['investorType', 'primaryGoal', 'experienceLevel', 'account'] as const
 type Step = (typeof STEPS)[number]
 
 const INVESTOR_TYPES: Array<{ value: InvestorType; icon: string; title: string; description: string }> = [
@@ -62,11 +62,16 @@ export function OnboardingFlow() {
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding)
   const skipOnboarding = useOnboardingStore((s) => s.skipOnboarding)
   const loadDemoData = useSimulationStore((s) => s.loadDemoData)
+  const setProfile = useUIStore((s) => s.setProfile)
 
   const [stepIndex, setStepIndex] = useState(0)
   const [investorType, setInvestorType] = useState<InvestorType | null>(null)
   const [primaryGoal, setPrimaryGoal] = useState<string | null>(null)
   const [experienceLevel, setExperienceLevel] = useState<InvestorProfile['experienceLevel'] | null>(null)
+
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
   const currentStep: Step = STEPS[stepIndex]
   const isLastStep = stepIndex === STEPS.length - 1
@@ -74,18 +79,41 @@ export function OnboardingFlow() {
   const canProceed =
     (currentStep === 'investorType' && investorType !== null) ||
     (currentStep === 'primaryGoal' && primaryGoal !== null) ||
-    (currentStep === 'experienceLevel' && experienceLevel !== null)
+    (currentStep === 'experienceLevel' && experienceLevel !== null) ||
+    (currentStep === 'account' &&
+      displayName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      password.trim().length >= 6)
+
+  function finishRegistration() {
+    localStorage.setItem(
+      'folio-demo-user',
+      JSON.stringify({
+        name: displayName.trim(),
+        email: email.trim(),
+        registeredAt: new Date().toISOString(),
+      })
+    )
+
+    setProfile({
+      displayName: displayName.trim(),
+      email: email.trim(),
+    })
+
+    completeOnboarding({
+      investorType: investorType!,
+      primaryGoal: primaryGoal!,
+      experienceLevel: experienceLevel!,
+    })
+
+    router.replace('/dashboard' as any)
+  }
 
   function handleNext() {
     if (!canProceed) return
 
     if (isLastStep) {
-      completeOnboarding({
-        investorType: investorType!,
-        primaryGoal: primaryGoal!,
-        experienceLevel: experienceLevel!,
-      })
-      router.replace('/dashboard' as any)
+      finishRegistration()
       return
     }
 
@@ -117,6 +145,7 @@ export function OnboardingFlow() {
             </div>
             <span className="font-semibold text-ink">Folio</span>
           </div>
+
           <button
             onClick={handleSkip}
             className="text-data-sm text-ink-faint hover:text-ink-muted transition-colors duration-150"
@@ -180,7 +209,7 @@ export function OnboardingFlow() {
                 Wie viel Erfahrung hast du?
               </h1>
               <p className="text-data-base text-ink-muted mb-6">
-                Letzter Schritt — danach geht&apos;s direkt ins Dashboard.
+                Danach erstellst du deinen Account.
               </p>
               <div className="grid grid-cols-1 gap-3">
                 {EXPERIENCE_LEVELS.map((e) => (
@@ -193,6 +222,58 @@ export function OnboardingFlow() {
                     onClick={() => setExperienceLevel(e.value)}
                   />
                 ))}
+              </div>
+            </>
+          )}
+
+          {currentStep === 'account' && (
+            <>
+              <h1 className="text-data-3xl font-semibold text-ink mb-2">
+                Account erstellen
+              </h1>
+              <p className="text-data-base text-ink-muted mb-6">
+                Erstelle deinen Account, damit du dein Portfolio speichern kannst.
+              </p>
+
+              <div className="space-y-4 rounded-2xl border border-border bg-surface/90 p-5">
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    Benutzername
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="z. B. Colin"
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    E-Mail
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="deine@email.de"
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    Passwort
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mindestens 6 Zeichen"
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                </div>
               </div>
             </>
           )}
@@ -212,8 +293,9 @@ export function OnboardingFlow() {
               </Button>
             )}
           </div>
+
           <Button variant="primary" onClick={handleNext} disabled={!canProceed}>
-            {isLastStep ? 'Fertig' : 'Weiter'}
+            {isLastStep ? 'Account erstellen' : 'Weiter'}
             <ArrowRight size={14} strokeWidth={2} />
           </Button>
         </div>
