@@ -169,7 +169,7 @@ export function AddTransactionModal() {
       open={isOpen}
       onClose={handleClose}
       title="Transaktion erfassen"
-      description="Gib Betrag, erhaltene Menge, Datum und Uhrzeit ein — der Kurs wird automatisch berechnet."
+      description="Gib Betrag, Menge, Datum und Uhrzeit ein — der Kurs wird automatisch berechnet."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
@@ -322,7 +322,7 @@ export function AddTransactionModal() {
         </div>
 
         <p className="text-data-xs text-ink-faint">
-          Ohne externe Kurs-API berechnet die App den Kurs aus Betrag ÷ Menge. Das funktioniert für Krypto, Aktien, ETFs, Metalle und Cash.
+          Ohne externe Kurs-API berechnet die App den Kurs aus Betrag ÷ Menge.
         </p>
 
         {error && (
