@@ -14,6 +14,7 @@ import { AssetRow } from '@/features/assets/AssetRow'
 import { cn, formatCurrency, formatPercent, formatRelativeTime, gainColor } from '@/lib/utils'
 import { ASSET_CLASS_META } from '@/lib/constants'
 import type { RankedPosition } from '@/features/portfolio/logic'
+import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   Trophy,
@@ -30,7 +31,6 @@ export function DashboardShell() {
   const openModal = useModalStore((s) => s.openModal)
   const loadDemoData = useSimulationStore((s) => s.loadDemoData)
 
-  // ── Loading state: persisted data hasn't hydrated from localStorage yet ──
   if (!hasHydrated) {
     return (
       <div className="space-y-6">
@@ -45,7 +45,6 @@ export function DashboardShell() {
     )
   }
 
-  // ── Empty state: brand-new portfolio, no assets yet ──
   if (assets.length === 0) {
     return (
       <EmptyState
@@ -72,6 +71,7 @@ export function DashboardShell() {
     filteredHistory.length >= 2
       ? filteredHistory[filteredHistory.length - 1].totalValue - filteredHistory[0].totalValue
       : 0
+
   const rangeChangePct =
     filteredHistory.length >= 2 && filteredHistory[0].totalValue > 0
       ? (rangeChange / filteredHistory[0].totalValue) * 100
@@ -79,7 +79,6 @@ export function DashboardShell() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* ── Summary KPIs: Total Value · Total Profit · Best Asset · Worst Asset ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Total Value"
@@ -131,7 +130,6 @@ export function DashboardShell() {
         />
       </div>
 
-      {/* ── Chart Area ── */}
       <GlassCard padding="none" className="overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 pt-5 pb-4 border-b border-border">
           <div>
@@ -156,9 +154,7 @@ export function DashboardShell() {
         </div>
       </GlassCard>
 
-      {/* ── Bottom grid: Top Positions + Recent Activity ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Top Positions */}
         <div className="lg:col-span-2">
           <GlassCard padding="none">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -175,7 +171,6 @@ export function DashboardShell() {
           </GlassCard>
         </div>
 
-        {/* Activity feed */}
         <div>
           <GlassCard padding="none" className="h-full">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -196,6 +191,7 @@ export function DashboardShell() {
                   const asset = assets.find((a) => a.id === tx.assetId)
                   const isBuy = tx.type === 'buy'
                   const total = tx.quantity * tx.price
+
                   return (
                     <div key={tx.id} className="flex items-center gap-3 px-5 py-3">
                       <div
@@ -235,11 +231,9 @@ export function DashboardShell() {
   )
 }
 
-// ─── Best / Worst Asset Card ──────────────────────────────────────────────────
-
 interface PerformerCardProps {
   label: string
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>
+  icon: LucideIcon
   ranked: RankedPosition | null
   accent: 'gain' | 'loss'
 }
