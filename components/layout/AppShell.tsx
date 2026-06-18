@@ -10,7 +10,7 @@ import { AddTransactionModal } from '@/features/transactions/AddTransactionModal
 import { AddPortfolioModal } from '@/features/portfolio/AddPortfolioModal'
 import { AddWatchlistItemModal } from '@/features/watchlist/AddWatchlistItemModal'
 import { LiveMarketDataProvider } from '@/features/portfolio/LiveMarketDataProvider'
-import { OnboardingGate } from '@/features/onboarding/OnboardingGate'
+import { AuthGate } from '@/features/auth/AuthGate'
 import { ToastContainer } from '@/components/ui'
 import { ChatBubble } from '@/components/ai-chat'
 
@@ -26,20 +26,16 @@ export function AppShell({ children, title, subtitle, topbarActions }: AppShellP
   const isCollapsed = sidebar === 'collapsed'
 
   return (
-    <OnboardingGate>
+    <AuthGate>
       <LiveMarketDataProvider>
         <div className="min-h-screen bg-void">
-          {/* Desktop sidebar (fixed, hidden below lg) */}
           <Sidebar />
-
-          {/* Mobile sidebar (slide-in drawer, hidden at lg and above) */}
           <MobileSidebar />
 
-          {/* Main content area */}
           <div
             className={cn(
               'flex flex-col min-h-screen transition-all duration-300 ease-in-out',
-              'ml-0', // mobile: no offset, sidebar is an overlay
+              'ml-0',
               isCollapsed ? 'lg:ml-16' : 'lg:ml-sidebar'
             )}
           >
@@ -49,19 +45,15 @@ export function AppShell({ children, title, subtitle, topbarActions }: AppShellP
             </main>
           </div>
 
-          {/* Global modals — available on every page */}
           <AddAssetModal />
           <AddTransactionModal />
           <AddPortfolioModal />
           <AddWatchlistItemModal />
 
-          {/* Toast notifications — error/success states surface here */}
           <ToastContainer />
-
-          {/* AI Chat — floating widget, always visible */}
           <ChatBubble />
         </div>
       </LiveMarketDataProvider>
-    </OnboardingGate>
+    </AuthGate>
   )
 }
