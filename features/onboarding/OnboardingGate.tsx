@@ -12,12 +12,12 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
     const publicPaths = ['/', '/login', '/onboarding']
     const isPublicPath = publicPaths.includes(pathname)
 
-    const demoUser =
+    const session =
       typeof window !== 'undefined'
-        ? localStorage.getItem('folio-demo-user')
+        ? localStorage.getItem('folio-demo-session')
         : null
 
-    if (!demoUser && !isPublicPath) {
+    if (!session && !isPublicPath) {
       router.replace('/' as any)
       return
     }
