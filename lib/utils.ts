@@ -15,6 +15,7 @@ const USD_TO_CURRENCY_RATE: Record<string, number> = {
   EUR: 0.86,
   GBP: 0.74,
   CHF: 0.80,
+  JPY: 150,
 }
 
 export function convertCurrencyValue(value: number, currency = 'USD'): number {
