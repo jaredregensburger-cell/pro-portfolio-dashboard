@@ -1,6 +1,7 @@
 'use client'
 
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { useUIStore } from '@/store'
 
 interface ChartTooltipProps {
   active?: boolean
@@ -11,9 +12,7 @@ interface ChartTooltipProps {
     dataKey?: string
     color?: string
   }>
-  /** Format the header label (defaults to a short date) */
   labelFormatter?: (label: string | number) => string
-  /** Format each row's value (defaults to currency) */
   valueFormatter?: (value: number) => string
 }
 
@@ -24,6 +23,8 @@ export function ChartTooltip({
   labelFormatter,
   valueFormatter,
 }: ChartTooltipProps) {
+  const currency = useUIStore((s) => s.currency)
+
   if (!active || !payload || payload.length === 0) return null
 
   const formattedLabel = labelFormatter
@@ -38,13 +39,10 @@ export function ChartTooltip({
       {payload.map((entry, i) => (
         <div key={i} className="flex items-center gap-2">
           {entry.color && (
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: entry.color }}
-            />
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
           )}
           <span className="font-mono text-data-sm font-medium text-ink">
-            {valueFormatter ? valueFormatter(entry.value) : formatCurrency(entry.value)}
+            {valueFormatter ? valueFormatter(entry.value) : formatCurrency(entry.value, currency)}
           </span>
           {entry.name && <span className="text-data-xs text-ink-muted">{entry.name}</span>}
         </div>
