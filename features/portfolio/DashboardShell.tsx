@@ -4,7 +4,7 @@ import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, Skele
 import { PortfolioValueChart } from '@/components/charts'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
-import { usePortfolioStore, useModalStore, useSimulationStore } from '@/store'
+import { usePortfolioStore, useModalStore, useSimulationStore, useUIStore } from '@/store'
 import {
   getPortfolioAnalytics,
   getPortfolioValueHistory,
@@ -28,6 +28,7 @@ export function DashboardShell() {
   const { assets, transactions, hasHydrated } = useActivePortfolioData()
   const { livePrices } = useLiveMarketDataContext()
   const { selectedTimeRange, setTimeRange } = usePortfolioStore()
+  const currency = useUIStore((s) => s.currency)
   const openModal = useModalStore((s) => s.openModal)
   const loadDemoData = useSimulationStore((s) => s.loadDemoData)
 
@@ -84,7 +85,7 @@ export function DashboardShell() {
           label="Total Value"
           value={analytics.totalValue}
           formatted
-          currency="USD"
+          currency={currency}
           changePct={analytics.unrealizedPnL.pct}
           changeLabel="unrealized"
           accent="signal"
@@ -102,15 +103,15 @@ export function DashboardShell() {
             )}
           >
             {analytics.totalProfit >= 0 ? '+' : ''}
-            {formatCurrency(analytics.totalProfit)}
+            {formatCurrency(analytics.totalProfit, currency)}
           </p>
           <div className="flex items-center gap-3 text-data-xs font-mono">
             <span className={gainColor(analytics.unrealizedPnL.amount)}>
-              Unrealized {formatCurrency(analytics.unrealizedPnL.amount)}
+              Unrealized {formatCurrency(analytics.unrealizedPnL.amount, currency)}
             </span>
             <span className="text-ink-faint">·</span>
             <span className={gainColor(analytics.realizedPnL)}>
-              Realized {formatCurrency(analytics.realizedPnL)}
+              Realized {formatCurrency(analytics.realizedPnL, currency)}
             </span>
           </div>
         </GlassCard>
@@ -136,12 +137,12 @@ export function DashboardShell() {
             <p className="text-data-sm text-ink-muted font-medium">Portfolio Performance</p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <p className="font-mono text-data-2xl font-semibold text-ink">
-                {formatCurrency(analytics.totalValue)}
+                {formatCurrency(analytics.totalValue, currency)}
               </p>
               {filteredHistory.length >= 2 && (
                 <span className={cn('font-mono text-data-sm font-medium', gainColor(rangeChange))}>
                   {rangeChange >= 0 ? '+' : ''}
-                  {formatCurrency(rangeChange)} ({formatPercent(rangeChangePct)})
+                  {formatCurrency(rangeChange, currency)} ({formatPercent(rangeChangePct)})
                 </span>
               )}
             </div>
@@ -217,7 +218,7 @@ export function DashboardShell() {
                         )}
                       >
                         {isBuy ? '-' : '+'}
-                        {formatCurrency(total)}
+                        {formatCurrency(total, currency)}
                       </p>
                     </div>
                   )
