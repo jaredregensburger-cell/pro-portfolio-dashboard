@@ -40,6 +40,7 @@ const INVESTOR_TYPE_LABELS: Record<string, string> = {
 }
 
 const DELETE_CONFIRMATION_PHRASE = 'Lösche diesen Account'
+const RESET_CONFIRMATION_PHRASE = 'reset all my data'
 
 export function SettingsShell() {
   const currency = useUIStore((s) => s.currency)
@@ -67,7 +68,9 @@ export function SettingsShell() {
   const [draftEmail, setDraftEmail] = useState(email)
   const [draftCurrency, setDraftCurrency] = useState(currency)
 
-  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetPhrase, setResetPhrase] = useState('')
+
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -111,13 +114,17 @@ export function SettingsShell() {
   }
 
   function handleReset() {
-    if (!confirmingReset) {
-      setConfirmingReset(true)
+    if (resetPhrase !== RESET_CONFIRMATION_PHRASE) {
+      showInfoToast(
+        'Bestätigung fehlt',
+        `Bitte exakt "${RESET_CONFIRMATION_PHRASE}" eingeben.`
+      )
       return
     }
 
     resetSimulation()
-    setConfirmingReset(false)
+    setShowResetConfirm(false)
+    setResetPhrase('')
     showInfoToast('Daten zurückgesetzt', 'Alle lokalen Portfolio-Daten wurden entfernt.')
   }
 
@@ -416,15 +423,50 @@ export function SettingsShell() {
               Load Demo Data
             </Button>
 
-            <Button
-              variant={confirmingReset ? 'danger' : 'outline'}
-              size="sm"
-              onClick={handleReset}
-              onBlur={() => setConfirmingReset(false)}
-            >
-              <Trash2 size={14} strokeWidth={1.75} />
-              {confirmingReset ? 'Click again to confirm' : 'Reset All Data'}
-            </Button>
+            {!showResetConfirm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowResetConfirm(true)}
+              >
+                <Trash2 size={14} strokeWidth={1.75} />
+                Reset All Data
+              </Button>
+            ) : (
+              <div className="w-full space-y-3 rounded-xl border border-loss/30 bg-loss/10 p-3">
+                <p className="text-data-sm text-loss">
+                  Gib exakt ein: <strong>{RESET_CONFIRMATION_PHRASE}</strong>
+                </p>
+
+                <Input
+                  value={resetPhrase}
+                  onChange={(e) => setResetPhrase(e.target.value)}
+                  placeholder={RESET_CONFIRMATION_PHRASE}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleReset}
+                    disabled={resetPhrase !== RESET_CONFIRMATION_PHRASE}
+                  >
+                    Daten endgültig zurücksetzen
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowResetConfirm(false)
+                      setResetPhrase('')
+                    }}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </GlassCard>
       </div>
@@ -471,6 +513,7 @@ export function SettingsShell() {
                 variant="danger"
                 size="sm"
                 onClick={handleDeleteAccount}
+                disabled={deletePhrase !== DELETE_CONFIRMATION_PHRASE}
               >
                 Account endgültig löschen
               </Button>
