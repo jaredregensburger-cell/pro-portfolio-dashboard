@@ -247,23 +247,6 @@ export function AddTransactionModal() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Datum"
-            type="date"
-            value={date}
-            max={toDateInputValue()}
-            onChange={(e) => setDate(e.target.value)}
-          />
-
-          <Input
-            label="Uhrzeit"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
-        </div>
-
         <Input
           label="Gebühr"
           type="number"
