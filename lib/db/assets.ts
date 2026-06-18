@@ -6,6 +6,13 @@
 import { supabase } from '@/lib/supabase'
 import type { AssetRow, AssetPerformanceView, AssetClassEnum } from '@/types/database'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type AssetAllocationRow = {
+  asset_class: AssetClassEnum
+  current_value: number | null
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -25,13 +32,16 @@ export async function getAssets(
   if (filters?.assetClass) {
     query = query.eq('asset_class', filters.assetClass)
   }
+
   if (filters?.activeOnly !== false) {
     query = query.eq('is_active', true)
   }
 
   const { data, error } = await query
+
   if (error) throw new Error(`getAssets: ${error.message}`)
-  return data ?? []
+
+  return (data ?? []) as AssetPerformanceView[]
 }
 
 /**
@@ -45,14 +55,21 @@ export async function getAsset(assetId: string): Promise<AssetPerformanceView | 
     .maybeSingle()
 
   if (error) throw new Error(`getAsset: ${error.message}`)
-  return data
+
+  return data as AssetPerformanceView | null
 }
 
 /**
  * Get asset allocation breakdown for a portfolio.
  * Returns each asset class with total value and percentage.
  */
-export async function getAssetAllocation(portfolioId: string) {
+export async function getAssetAllocation(portfolioId: string): Promise<
+  {
+    assetClass: AssetClassEnum
+    value: number
+    pct: number
+  }[]
+> {
   const { data, error } = await supabase
     .from('v_asset_performance')
     .select('asset_class, current_value')
@@ -61,10 +78,15 @@ export async function getAssetAllocation(portfolioId: string) {
 
   if (error) throw new Error(`getAssetAllocation: ${error.message}`)
 
-  const totalValue = (data ?? []).reduce((sum, a) => sum + (a.current_value ?? 0), 0)
+  const rows = (data ?? []) as AssetAllocationRow[]
 
-  const byClass = (data ?? []).reduce<Record<string, number>>((acc, a) => {
-    acc[a.asset_class] = (acc[a.asset_class] ?? 0) + (a.current_value ?? 0)
+  const totalValue = rows.reduce(
+    (sum, a) => sum + Number(a.current_value ?? 0),
+    0
+  )
+
+  const byClass = rows.reduce<Record<string, number>>((acc, a) => {
+    acc[a.asset_class] = (acc[a.asset_class] ?? 0) + Number(a.current_value ?? 0)
     return acc
   }, {})
 
@@ -84,36 +106,37 @@ export async function getAssetAllocation(portfolioId: string) {
  */
 export async function createAsset(input: {
   portfolioId: string
-  ticker:      string
-  name:        string
-  assetClass:  AssetClassEnum
-  currency?:   string
-  logoUrl?:    string
+  ticker: string
+  name: string
+  assetClass: AssetClassEnum
+  currency?: string
+  logoUrl?: string
 }): Promise<AssetRow> {
   const { data, error } = await supabase
     .from('assets')
     .insert({
-      portfolio_id:  input.portfolioId,
-      ticker:        input.ticker.toUpperCase(),
-      name:          input.name,
-      asset_class:   input.assetClass,
-      currency:      input.currency ?? 'USD',
-      logo_url:      input.logoUrl ?? null,
+      portfolio_id: input.portfolioId,
+      ticker: input.ticker.toUpperCase(),
+      name: input.name,
+      asset_class: input.assetClass,
+      currency: input.currency ?? 'USD',
+      logo_url: input.logoUrl ?? null,
       current_price: 0,
     })
     .select()
     .single()
 
   if (error) throw new Error(`createAsset: ${error.message}`)
-  return data
+
+  return data as AssetRow
 }
 
 /**
- * Update an asset's market price (called by price feed).
+ * Update an asset's market price.
  * NOTE: Never update quantity or avg_cost_basis directly — use transactions.
  */
 export async function updateAssetPrice(
-  assetId:      string,
+  assetId: string,
   currentPrice: number
 ): Promise<AssetRow> {
   const { data, error } = await supabase
@@ -124,11 +147,12 @@ export async function updateAssetPrice(
     .single()
 
   if (error) throw new Error(`updateAssetPrice: ${error.message}`)
-  return data
+
+  return data as AssetRow
 }
 
 /**
- * Update asset metadata (name, logo, etc.)
+ * Update asset metadata.
  */
 export async function updateAsset(
   assetId: string,
@@ -137,7 +161,7 @@ export async function updateAsset(
   const { data, error } = await supabase
     .from('assets')
     .update({
-      ...(input.name    !== undefined && { name: input.name }),
+      ...(input.name !== undefined && { name: input.name }),
       ...(input.logoUrl !== undefined && { logo_url: input.logoUrl }),
     })
     .eq('id', assetId)
@@ -145,29 +169,30 @@ export async function updateAsset(
     .single()
 
   if (error) throw new Error(`updateAsset: ${error.message}`)
-  return data
+
+  return data as AssetRow
 }
 
 /**
  * Find or create an asset by ticker within a portfolio.
- * Useful when recording transactions — ensures the asset exists first.
  */
 export async function findOrCreateAsset(input: {
   portfolioId: string
-  ticker:      string
-  name:        string
-  assetClass:  AssetClassEnum
-  currency?:   string
+  ticker: string
+  name: string
+  assetClass: AssetClassEnum
+  currency?: string
 }): Promise<AssetRow> {
-  // Try to find existing
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from('assets')
     .select('*')
     .eq('portfolio_id', input.portfolioId)
     .eq('ticker', input.ticker.toUpperCase())
     .maybeSingle()
 
-  if (existing) return existing
+  if (error) throw new Error(`findOrCreateAsset: ${error.message}`)
+
+  if (existing) return existing as AssetRow
 
   return createAsset(input)
 }
