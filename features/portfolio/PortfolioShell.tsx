@@ -52,7 +52,7 @@ export function PortfolioShell() {
           label="Total Value"
           value={totalValue}
           formatted
-          currency="USD"
+          currency={currency}
           changePct={unrealizedPnL.pct}
           changeLabel="unrealized"
           accent="signal"
