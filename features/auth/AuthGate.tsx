@@ -26,12 +26,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
     if (!user && !isPublic) {
-      router.replace('/login')
+      router.replace('/login' as any)
       return
     }
 
     if (user && (pathname === '/login' || pathname === '/')) {
-      router.replace('/dashboard')
+      router.replace('/dashboard' as any)
     }
   }, [initialized, user, pathname, router])
 
