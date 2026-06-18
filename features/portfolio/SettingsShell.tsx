@@ -39,6 +39,8 @@ const INVESTOR_TYPE_LABELS: Record<string, string> = {
   aggressive: 'Aggressiv',
 }
 
+const DELETE_CONFIRMATION_PHRASE = 'Lösche diesen Account'
+
 export function SettingsShell() {
   const currency = useUIStore((s) => s.currency)
   const setCurrency = useUIStore((s) => s.setCurrency)
@@ -70,6 +72,9 @@ export function SettingsShell() {
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletePhrase, setDeletePhrase] = useState('')
+
   function scrollToSection(id: string) {
     document.getElementById(id)?.scrollIntoView({
       behavior: 'smooth',
@@ -80,10 +85,27 @@ export function SettingsShell() {
   function handleSave() {
     setProfile({
       displayName: draftName.trim() || 'Investor',
-      email: draftEmail.trim() || 'alex@folio.app',
+      email: draftEmail.trim() || '',
     })
 
     setCurrency(draftCurrency)
+
+    const rawAccount = localStorage.getItem('folio-demo-account')
+    if (rawAccount) {
+      try {
+        const account = JSON.parse(rawAccount)
+        localStorage.setItem(
+          'folio-demo-account',
+          JSON.stringify({
+            ...account,
+            name: draftName.trim() || account.name,
+            email: draftEmail.trim() || account.email,
+          })
+        )
+      } catch {
+        // ignore invalid localStorage data
+      }
+    }
 
     showInfoToast('Gespeichert', 'Deine Einstellungen wurden gespeichert.')
   }
@@ -122,6 +144,19 @@ export function SettingsShell() {
     }
 
     setEditingPortfolioId(null)
+  }
+
+  function handleDeleteAccount() {
+    if (deletePhrase !== DELETE_CONFIRMATION_PHRASE) {
+      showInfoToast(
+        'Bestätigung fehlt',
+        `Bitte exakt "${DELETE_CONFIRMATION_PHRASE}" eingeben.`
+      )
+      return
+    }
+
+    localStorage.clear()
+    window.location.href = '/'
   }
 
   return (
@@ -164,7 +199,7 @@ export function SettingsShell() {
                 type="text"
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
-                placeholder="Alex Investor"
+                placeholder="Colin"
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal focus:ring-1 focus:ring-signal transition-colors duration-150"
               />
             </div>
@@ -177,7 +212,7 @@ export function SettingsShell() {
                 type="email"
                 value={draftEmail}
                 onChange={(e) => setDraftEmail(e.target.value)}
-                placeholder="alex@folio.app"
+                placeholder="deine@email.de"
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal focus:ring-1 focus:ring-signal transition-colors duration-150"
               />
             </div>
@@ -402,13 +437,57 @@ export function SettingsShell() {
       </div>
 
       <GlassCard accent="loss">
-        <h2 className="text-data-base font-semibold text-ink mb-1">Danger Zone</h2>
+        <h2 className="text-data-base font-semibold text-ink mb-1">
+          Danger Zone
+        </h2>
+
         <p className="text-data-sm text-ink-muted mb-4">
-          Irreversible actions — proceed with caution
+          Das Löschen des Accounts entfernt alle lokalen Daten dauerhaft.
         </p>
-        <Button variant="danger" size="sm">
-          Delete Account
-        </Button>
+
+        {!showDeleteConfirm ? (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            Delete Account
+          </Button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-data-sm text-loss">
+              Gib exakt ein:{' '}
+              <strong>{DELETE_CONFIRMATION_PHRASE}</strong>
+            </p>
+
+            <Input
+              value={deletePhrase}
+              onChange={(e) => setDeletePhrase(e.target.value)}
+              placeholder={DELETE_CONFIRMATION_PHRASE}
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDeleteAccount}
+              >
+                Account endgültig löschen
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeletePhrase('')
+                }}
+              >
+                Abbrechen
+              </Button>
+            </div>
+          </div>
+        )}
       </GlassCard>
     </div>
   )
