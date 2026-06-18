@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
   }
 
   const json = await response.json()
-
   const rawItems = Array.isArray(json.data) ? json.data : []
 
   const assets = rawItems
