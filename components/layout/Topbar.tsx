@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Bell, Search, ChevronDown, Menu, Settings, LogOut, User } from 'lucide-react'
 import { cn, initials } from '@/lib/utils'
 import { Button } from '@/components/ui'
@@ -17,6 +18,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ title, subtitle, actions }: TopbarProps) {
+  const router = useRouter()
   const { status, lastUpdatedAt, staleTickers, refresh } = useLiveMarketDataContext()
   const openMobileSidebar = useUIStore((s) => s.openMobileSidebar)
   const displayName = useUIStore((s) => s.displayName)
@@ -24,6 +26,14 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
   const [userOpen, setUserOpen] = useState(false)
 
   const firstName = displayName?.trim()?.split(' ')[0] || 'Investor'
+
+  function handleLogout() {
+    setUserOpen(false)
+
+    localStorage.removeItem('folio-demo-user')
+
+    router.push('/' as any)
+  }
 
   return (
     <header className="relative flex h-topbar items-center justify-between gap-3 px-4 sm:px-6 border-b border-border bg-surface/80 backdrop-blur-glass shrink-0">
@@ -129,26 +139,23 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
                 Settings
               </Link>
 
-              <button
-                onClick={() => {
-                  setUserOpen(false)
-                  showInfoToast('Profil', 'Profilverwaltung ist noch nicht verbunden.')
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-ink hover:bg-surface-raised transition-colors"
+              <Link
+                href="/settings"
+                onClick={() => setUserOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-ink hover:bg-surface-raised transition-colors"
               >
                 <User size={14} />
                 Profile
-              </button>
+              </Link>
 
               <button
-  onClick={() => {
-    setUserOpen(false)
-  }}
-  className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
->
-  <LogOut size={14} />
-  Logout
-</button>
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
+              >
+                <LogOut size={14} />
+                Logout
+              </button>
             </div>
           )}
         </div>
