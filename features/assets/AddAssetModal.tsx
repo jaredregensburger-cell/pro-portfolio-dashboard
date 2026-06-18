@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Search, Zap, ChevronRight } from 'lucide-react'
 import { Modal, Input, Select, Button } from '@/components/ui'
 import { useModalStore, useSimulationStore, useUIStore } from '@/store'
-import { ASSET_CLASS_OPTIONS, CURRENCIES } from '@/lib/constants'
+import { ASSET_CLASS_OPTIONS } from '@/lib/constants'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import { TOP_STOCKS } from './topStocks'
 import { TOP_CRYPTO } from './topCrypto'
@@ -23,7 +23,14 @@ const initialManualState = {
   ticker: '',
   name: '',
   assetClass: 'stock' as AssetClass,
-  currency: 'USD',
+}
+
+function getPrefix(currency: string) {
+  if (currency === 'EUR') return '€'
+  if (currency === 'GBP') return '£'
+  if (currency === 'CHF') return 'Fr'
+  if (currency === 'JPY') return '¥'
+  return '$'
 }
 
 function AssetPickRow({
@@ -51,7 +58,7 @@ function AssetPickRow({
         <div className="min-w-0">
           <p className="text-data-sm font-medium text-ink truncate">{asset.name}</p>
           <p className="text-data-xs text-ink-faint font-mono">
-            {asset.symbol} · {asset.currency}
+            {asset.symbol}
           </p>
         </div>
       </div>
@@ -153,19 +160,10 @@ export function AddAssetModal() {
       ? ownedValueNum / ownedQuantityNum
       : 0
 
-  function getPrefix(currency: string) {
-    if (currency === 'EUR') return '€'
-    if (currency === 'GBP') return '£'
-    if (currency === 'CHF') return 'Fr'
-    if (currency === 'JPY') return '¥'
-    return '$'
-  }
-
   function submitAsset(input: {
     ticker: string
     name: string
     assetClass: AssetClass
-    currency?: string
   }) {
     setError(null)
 
@@ -178,7 +176,7 @@ export function AddAssetModal() {
       ticker: input.ticker,
       name: input.name,
       assetClass: input.assetClass,
-      currency: input.currency ?? displayCurrency,
+      currency: displayCurrency,
       initialQuantity: ownedQuantityNum,
       initialValue: ownedValueNum,
       initialFee: 0,
@@ -208,7 +206,6 @@ export function AddAssetModal() {
       ticker: selectedCatalogAsset.symbol,
       name: selectedCatalogAsset.name,
       assetClass: selectedCatalogAsset.type as AssetClass,
-      currency: selectedCatalogAsset.currency,
     })
   }
 
@@ -219,14 +216,11 @@ export function AddAssetModal() {
       ticker: manualForm.ticker,
       name: manualForm.name,
       assetClass: manualForm.assetClass,
-      currency: manualForm.currency,
     })
   }
 
-  const activeCurrency =
-    selectedCatalogAsset?.currency ??
-    manualForm.currency ??
-    displayCurrency
+  const activeCurrency = displayCurrency
+  const prefix = getPrefix(activeCurrency)
 
   return (
     <Modal
@@ -290,7 +284,7 @@ export function AddAssetModal() {
               {!search && (
                 <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
                   <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
-                  Wähle ein Asset aus und trage danach deinen aktuellen Bestand ein.
+                  Wähle ein Asset aus und trage danach deinen aktuellen Bestand in {displayCurrency} ein.
                 </p>
               )}
             </>
@@ -301,7 +295,7 @@ export function AddAssetModal() {
                   {selectedCatalogAsset.name}
                 </p>
                 <p className="text-data-xs text-ink-faint font-mono">
-                  {selectedCatalogAsset.symbol} · {selectedCatalogAsset.currency}
+                  {selectedCatalogAsset.symbol} · Eingabe in {displayCurrency}
                 </p>
 
                 <button
@@ -319,7 +313,7 @@ export function AddAssetModal() {
                 onQuantityChange={setOwnedQuantity}
                 onValueChange={setOwnedValue}
                 currency={activeCurrency}
-                prefix={getPrefix(activeCurrency)}
+                prefix={prefix}
                 calculatedPrice={calculatedPrice}
                 ticker={selectedCatalogAsset.symbol}
               />
@@ -346,7 +340,7 @@ export function AddAssetModal() {
       {tab === 'manual' && (
         <form onSubmit={handleManualSubmit} className="space-y-4">
           <p className="text-data-sm text-ink-muted">
-            Gib das Asset manuell ein — z. B. für exotische Aktien, ETFs oder physische Metalle.
+            Gib das Asset manuell ein. Alle Werte werden in {displayCurrency} gespeichert.
           </p>
 
           <Input
@@ -370,36 +364,22 @@ export function AddAssetModal() {
             required
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Typ"
-              value={manualForm.assetClass}
-              onChange={(e) =>
-                setManualForm((f) => ({ ...f, assetClass: e.target.value as AssetClass }))
-              }
-              options={ASSET_CLASS_OPTIONS}
-            />
-
-            <Select
-              label="Währung"
-              value={manualForm.currency}
-              onChange={(e) =>
-                setManualForm((f) => ({ ...f, currency: e.target.value }))
-              }
-              options={CURRENCIES.map((c) => ({
-                label: `${c.symbol} ${c.value}`,
-                value: c.value,
-              }))}
-            />
-          </div>
+          <Select
+            label="Typ"
+            value={manualForm.assetClass}
+            onChange={(e) =>
+              setManualForm((f) => ({ ...f, assetClass: e.target.value as AssetClass }))
+            }
+            options={ASSET_CLASS_OPTIONS}
+          />
 
           <OwnedPositionFields
             quantity={ownedQuantity}
             value={ownedValue}
             onQuantityChange={setOwnedQuantity}
             onValueChange={setOwnedValue}
-            currency={manualForm.currency}
-            prefix={getPrefix(manualForm.currency)}
+            currency={activeCurrency}
+            prefix={prefix}
             calculatedPrice={calculatedPrice}
             ticker={manualForm.ticker || 'Asset'}
           />
