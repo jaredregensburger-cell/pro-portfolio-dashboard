@@ -1,33 +1,58 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
-// ─── Class Name Utility ──────────────────────────────────────────────────────
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// ─── Number Formatters ───────────────────────────────────────────────────────
+// ─── Currency Conversion ──────────────────────────────────────────────────────
+// Base currency in the app is USD.
+// These are fixed approximate rates.
+// Example: 72 USD * 0.86 = 61.92 EUR
+
+const USD_TO_CURRENCY_RATE: Record<string, number> = {
+  USD: 1,
+  EUR: 0.86,
+  GBP: 0.74,
+  CHF: 0.80,
+}
+
+export function convertCurrencyValue(value: number, currency = 'USD'): number {
+  const rate = USD_TO_CURRENCY_RATE[currency] ?? 1
+  return value * rate
+}
 
 export function formatCurrency(
   value: number,
   currency = 'USD',
   compact = false
 ): string {
-  if (compact && Math.abs(value) >= 1_000_000) {
-    return new Intl.NumberFormat('en-US', {
+  const convertedValue = convertCurrencyValue(value, currency)
+
+  const locale =
+    currency === 'EUR'
+      ? 'de-DE'
+      : currency === 'GBP'
+        ? 'en-GB'
+        : currency === 'CHF'
+          ? 'de-CH'
+          : 'en-US'
+
+  if (compact && Math.abs(convertedValue) >= 1_000_000) {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       notation: 'compact',
       maximumFractionDigits: 2,
-    }).format(value)
+    }).format(convertedValue)
   }
-  return new Intl.NumberFormat('en-US', {
+
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value)
+  }).format(convertedValue)
 }
 
 export function formatPercent(value: number, decimals = 2): string {
@@ -49,20 +74,24 @@ export function formatCompact(value: number): string {
   }).format(value)
 }
 
-// ─── Date Formatters ─────────────────────────────────────────────────────────
-
-export function formatDate(date: string | Date, style: 'short' | 'medium' | 'long' = 'medium'): string {
+export function formatDate(
+  date: string | Date,
+  style: 'short' | 'medium' | 'long' = 'medium'
+): string {
   const d = typeof date === 'string' ? new Date(date) : date
+
   const formats: Record<typeof style, Intl.DateTimeFormatOptions> = {
     short: { month: 'numeric', day: 'numeric', year: '2-digit' },
     medium: { month: 'short', day: 'numeric', year: 'numeric' },
     long: { month: 'long', day: 'numeric', year: 'numeric' },
   }
+
   return new Intl.DateTimeFormat('en-US', formats[style]).format(d)
 }
 
 export function formatTime(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date
+
   return new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
@@ -81,10 +110,9 @@ export function formatRelativeTime(date: string | Date): string {
   if (diffMins < 60) return `${diffMins}m ago`
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
+
   return formatDate(d, 'short')
 }
-
-// ─── Asset / Finance Utilities ───────────────────────────────────────────────
 
 export function calcGain(currentValue: number, costBasis: number) {
   const gain = currentValue - costBasis
@@ -108,8 +136,6 @@ export function gainBgColor(value: number): string {
   return 'bg-surface-elevated text-ink-muted'
 }
 
-// ─── String Utilities ────────────────────────────────────────────────────────
-
 export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str
   return `${str.slice(0, maxLength - 3)}...`
@@ -124,28 +150,32 @@ export function initials(name: string): string {
     .slice(0, 2)
 }
 
-// ─── ID Generation ────────────────────────────────────────────────────────────
-
 export function generateId(prefix?: string): string {
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
   return prefix ? `${prefix}_${id}` : id
 }
 
-// ─── Date Input Helpers ──────────────────────────────────────────────────────
-
-/** Format a Date/ISO string as YYYY-MM-DD for <input type="date"> */
 export function toDateInputValue(date: string | Date = new Date()): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toISOString().split('T')[0]
 }
 
-/** Convert a YYYY-MM-DD date input value to a full ISO timestamp (preserves current time) */
 export function fromDateInputValue(value: string): string {
   const now = new Date()
   const [year, month, day] = value.split('-').map(Number)
-  const d = new Date(year, (month ?? 1) - 1, day ?? 1, now.getHours(), now.getMinutes(), now.getSeconds())
+
+  const d = new Date(
+    year,
+    (month ?? 1) - 1,
+    day ?? 1,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds()
+  )
+
   return d.toISOString()
 }
