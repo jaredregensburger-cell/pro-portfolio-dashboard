@@ -3,7 +3,7 @@
 import { GlassCard, EmptyState, StatCard, SkeletonCard } from '@/components/ui'
 import { AllocationDonut } from '@/components/charts'
 import { PieChart, Wallet } from 'lucide-react'
-import { useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { getPortfolioAnalytics } from '@/features/portfolio/logic'
