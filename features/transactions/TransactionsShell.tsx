@@ -1,14 +1,21 @@
 'use client'
 
 import { GlassCard, Badge, EmptyState, Button, SkeletonTable } from '@/components/ui'
-import { useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { showInfoToast } from '@/store/toast.store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { formatCurrency, formatNumber, formatDate, cn } from '@/lib/utils'
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Trash2, PackagePlus } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
+  Trash2,
+  PackagePlus,
+} from 'lucide-react'
 
 export function TransactionsShell() {
   const { assets, transactions, hasHydrated } = useActivePortfolioData()
+  const currency = useUIStore((s) => s.currency)
   const removeTransaction = useSimulationStore((s) => s.removeTransaction)
   const openModal = useModalStore((s) => s.openModal)
 
@@ -16,7 +23,6 @@ export function TransactionsShell() {
     return <SkeletonTable rows={6} />
   }
 
-  // ── Empty states ──
   if (assets.length === 0) {
     return (
       <EmptyState
@@ -46,7 +52,6 @@ export function TransactionsShell() {
   return (
     <div className="space-y-4 animate-fade-in">
       <GlassCard padding="none" className="overflow-x-auto">
-        {/* Header */}
         <div className="flex items-center gap-4 px-5 py-3 border-b border-border min-w-[600px]">
           <div className="w-9 shrink-0" />
           <p className="flex-1 text-data-xs font-medium text-ink-faint uppercase tracking-wide">
@@ -70,7 +75,6 @@ export function TransactionsShell() {
           <div className="w-9 shrink-0" />
         </div>
 
-        {/* Rows */}
         <div className="divide-y divide-border min-w-[600px]">
           {sorted.map((tx) => {
             const asset = assets.find((a) => a.id === tx.assetId)
@@ -82,17 +86,19 @@ export function TransactionsShell() {
                 key={tx.id}
                 className="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-raised transition-colors duration-150 group"
               >
-                {/* Icon */}
                 <div
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
                     isBuy ? 'bg-signal/10 text-signal' : 'bg-gain/10 text-gain'
                   )}
                 >
-                  {isBuy ? <ArrowDownLeft size={15} strokeWidth={2} /> : <ArrowUpRight size={15} strokeWidth={2} />}
+                  {isBuy ? (
+                    <ArrowDownLeft size={15} strokeWidth={2} />
+                  ) : (
+                    <ArrowUpRight size={15} strokeWidth={2} />
+                  )}
                 </div>
 
-                {/* Asset */}
                 <div className="flex-1 min-w-0">
                   <p className="text-data-sm font-semibold text-ink truncate">
                     {asset?.ticker ?? '—'}
@@ -103,28 +109,24 @@ export function TransactionsShell() {
                   </p>
                 </div>
 
-                {/* Type */}
                 <div className="hidden sm:block w-16">
                   <Badge variant={isBuy ? 'signal' : 'gain'} size="sm">
                     {isBuy ? 'Buy' : 'Sell'}
                   </Badge>
                 </div>
 
-                {/* Quantity */}
                 <div className="hidden md:block text-right w-24">
                   <p className="font-mono text-data-sm text-ink-muted">
                     {formatNumber(tx.quantity, 4)}
                   </p>
                 </div>
 
-                {/* Price */}
                 <div className="hidden md:block text-right w-24">
                   <p className="font-mono text-data-sm text-ink-muted">
-                    {formatCurrency(tx.price)}
+                    {formatCurrency(tx.price, currency)}
                   </p>
                 </div>
 
-                {/* Amount */}
                 <div className="text-right w-28">
                   <p
                     className={cn(
@@ -133,30 +135,32 @@ export function TransactionsShell() {
                     )}
                   >
                     {isBuy ? '-' : '+'}
-                    {formatCurrency(total)}
+                    {formatCurrency(total, currency)}
                   </p>
+
                   {tx.fee > 0 && (
                     <p className="font-mono text-data-xs text-ink-faint">
-                      Fee {formatCurrency(tx.fee)}
+                      Fee {formatCurrency(tx.fee, currency)}
                     </p>
                   )}
                 </div>
 
-                {/* Date */}
                 <div className="hidden sm:block text-right w-24">
                   <p className="font-mono text-data-xs text-ink-muted">
                     {formatDate(tx.executedAt, 'short')}
                   </p>
                 </div>
 
-                {/* Remove */}
                 <div className="w-9 shrink-0 flex justify-end">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => {
                       removeTransaction(tx.id)
-                      showInfoToast('Transaktion gelöscht', `${isBuy ? 'Kauf' : 'Verkauf'} von ${asset?.ticker ?? 'Asset'} entfernt.`)
+                      showInfoToast(
+                        'Transaktion gelöscht',
+                        `${isBuy ? 'Kauf' : 'Verkauf'} von ${asset?.ticker ?? 'Asset'} entfernt.`
+                      )
                     }}
                     title="Transaktion löschen"
                     className="opacity-0 group-hover:opacity-100 hover:text-loss"
