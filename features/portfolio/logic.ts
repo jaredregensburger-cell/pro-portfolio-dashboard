@@ -35,7 +35,11 @@ export function computeAssetPosition(
   const isInitialSnapshotOnly =
     txns.length === 1 &&
     txns[0]?.type === 'buy' &&
-    txns[0]?.note === 'START_SNAPSHOT'
+    (
+      txns[0]?.note === 'START_SNAPSHOT' ||
+      txns[0]?.note === 'Startbestand' ||
+      txns[0]?.note === 'Startbestand beim Asset-Anlegen'
+    )
 
   const livePrice = livePrices?.get(asset.ticker)
 
