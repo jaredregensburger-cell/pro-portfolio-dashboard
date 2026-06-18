@@ -111,9 +111,8 @@ export function AddAssetModal() {
   const [manualForm, setManualForm] = useState(initialManualState)
   const [selectedCatalogAsset, setSelectedCatalogAsset] = useState<GlobalAsset | null>(null)
 
-  const [initialQuantity, setInitialQuantity] = useState('')
-  const [initialValue, setInitialValue] = useState('')
-  const [initialFee, setInitialFee] = useState('0')
+  const [ownedQuantity, setOwnedQuantity] = useState('')
+  const [ownedValue, setOwnedValue] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -123,9 +122,8 @@ export function AddAssetModal() {
     setSearch('')
     setManualForm(initialManualState)
     setSelectedCatalogAsset(null)
-    setInitialQuantity('')
-    setInitialValue('')
-    setInitialFee('0')
+    setOwnedQuantity('')
+    setOwnedValue('')
     setError(null)
   }, [isOpen])
 
@@ -147,13 +145,12 @@ export function AddAssetModal() {
 
   const currentList = tab === 'stocks' ? filteredStocks : filteredCrypto
 
-  const initialQuantityNum = parseFloat(initialQuantity) || 0
-  const initialValueNum = parseFloat(initialValue) || 0
-  const initialFeeNum = parseFloat(initialFee) || 0
+  const ownedQuantityNum = parseFloat(ownedQuantity) || 0
+  const ownedValueNum = parseFloat(ownedValue) || 0
 
   const calculatedPrice =
-    initialQuantityNum > 0 && initialValueNum > 0
-      ? Math.max((initialValueNum - initialFeeNum) / initialQuantityNum, 0)
+    ownedQuantityNum > 0 && ownedValueNum > 0
+      ? ownedValueNum / ownedQuantityNum
       : 0
 
   function getPrefix(currency: string) {
@@ -172,8 +169,8 @@ export function AddAssetModal() {
   }) {
     setError(null)
 
-    if ((initialQuantityNum > 0 && initialValueNum <= 0) || (initialValueNum > 0 && initialQuantityNum <= 0)) {
-      setError('Wenn du eine Startposition einträgst, müssen Menge und aktueller Wert beide ausgefüllt sein.')
+    if ((ownedQuantityNum > 0 && ownedValueNum <= 0) || (ownedValueNum > 0 && ownedQuantityNum <= 0)) {
+      setError('Bitte trage Menge und aktuellen Wert ein — oder lasse beide Felder leer.')
       return
     }
 
@@ -182,12 +179,12 @@ export function AddAssetModal() {
       name: input.name,
       assetClass: input.assetClass,
       currency: input.currency ?? displayCurrency,
-      initialQuantity: initialQuantityNum,
-      initialValue: initialValueNum,
-      initialFee: initialFeeNum,
+      initialQuantity: ownedQuantityNum,
+      initialValue: ownedValueNum,
+      initialFee: 0,
       initialNote:
-        initialQuantityNum > 0 && initialValueNum > 0
-          ? 'Startbestand beim Asset-Anlegen'
+        ownedQuantityNum > 0 && ownedValueNum > 0
+          ? 'START_SNAPSHOT'
           : undefined,
     })
 
@@ -236,7 +233,7 @@ export function AddAssetModal() {
       open={isOpen}
       onClose={closeModal}
       title="Asset hinzufügen"
-      description="Lege ein Asset an und trage optional direkt deinen aktuellen Bestand ein."
+      description="Wähle ein Asset aus und trage ein, wie viel du aktuell besitzt."
       maxWidth="md"
     >
       <div className="flex gap-1 p-1 rounded-lg bg-surface-raised border border-border mb-4">
@@ -293,7 +290,7 @@ export function AddAssetModal() {
               {!search && (
                 <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
                   <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
-                  Wähle ein Asset aus und trage danach optional deinen Bestand ein.
+                  Wähle ein Asset aus und trage danach deinen aktuellen Bestand ein.
                 </p>
               )}
             </>
@@ -316,13 +313,11 @@ export function AddAssetModal() {
                 </button>
               </div>
 
-              <InitialPositionFields
-                quantity={initialQuantity}
-                value={initialValue}
-                fee={initialFee}
-                onQuantityChange={setInitialQuantity}
-                onValueChange={setInitialValue}
-                onFeeChange={setInitialFee}
+              <OwnedPositionFields
+                quantity={ownedQuantity}
+                value={ownedValue}
+                onQuantityChange={setOwnedQuantity}
+                onValueChange={setOwnedValue}
                 currency={activeCurrency}
                 prefix={getPrefix(activeCurrency)}
                 calculatedPrice={calculatedPrice}
@@ -398,13 +393,11 @@ export function AddAssetModal() {
             />
           </div>
 
-          <InitialPositionFields
-            quantity={initialQuantity}
-            value={initialValue}
-            fee={initialFee}
-            onQuantityChange={setInitialQuantity}
-            onValueChange={setInitialValue}
-            onFeeChange={setInitialFee}
+          <OwnedPositionFields
+            quantity={ownedQuantity}
+            value={ownedValue}
+            onQuantityChange={setOwnedQuantity}
+            onValueChange={setOwnedValue}
             currency={manualForm.currency}
             prefix={getPrefix(manualForm.currency)}
             calculatedPrice={calculatedPrice}
@@ -431,13 +424,11 @@ export function AddAssetModal() {
   )
 }
 
-function InitialPositionFields({
+function OwnedPositionFields({
   quantity,
   value,
-  fee,
   onQuantityChange,
   onValueChange,
-  onFeeChange,
   currency,
   prefix,
   calculatedPrice,
@@ -445,10 +436,8 @@ function InitialPositionFields({
 }: {
   quantity: string
   value: string
-  fee: string
   onQuantityChange: (value: string) => void
   onValueChange: (value: string) => void
-  onFeeChange: (value: string) => void
   currency: string
   prefix: string
   calculatedPrice: number
@@ -458,16 +447,16 @@ function InitialPositionFields({
     <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
       <div>
         <p className="text-data-sm font-semibold text-ink">
-          Startposition optional
+          Im Besitz
         </p>
         <p className="text-data-xs text-ink-faint mt-0.5">
-          Trage deinen aktuellen Bestand ein. Die App berechnet daraus den Kurs.
+          Trage ein, wie viel du aktuell besitzt und wie viel es aktuell wert ist. Die Rendite startet bei 0,00 %.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
-          label={`Aktuelle Menge (${ticker})`}
+          label={`Im Besitz (${ticker})`}
           type="number"
           inputMode="decimal"
           step="any"
@@ -490,21 +479,9 @@ function InitialPositionFields({
         />
       </div>
 
-      <Input
-        label="Gebühr optional"
-        type="number"
-        inputMode="decimal"
-        step="any"
-        min="0"
-        placeholder="0.00"
-        prefix={prefix}
-        value={fee}
-        onChange={(e) => onFeeChange(e.target.value)}
-      />
-
       <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2">
         <p className="text-data-xs text-ink-muted uppercase tracking-wide">
-          Berechneter Kurs
+          Startkurs
         </p>
         <p className="font-mono text-data-sm text-ink">
           {calculatedPrice > 0
@@ -515,8 +492,8 @@ function InitialPositionFields({
 
       {quantity && value && (
         <p className="text-data-xs text-ink-faint">
-          Beispiel: {formatNumber(parseFloat(quantity) || 0, 8)} {ticker} mit einem Wert von{' '}
-          {formatCurrency(parseFloat(value) || 0, currency)}.
+          Start: {formatNumber(parseFloat(quantity) || 0, 8)} {ticker} mit einem Wert von{' '}
+          {formatCurrency(parseFloat(value) || 0, currency)}. Rendite startet bei 0,00 %.
         </p>
       )}
     </div>
