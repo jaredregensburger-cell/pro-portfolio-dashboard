@@ -1,21 +1,21 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { Search, Zap, ChevronRight } from 'lucide-react'
+import { Search, Zap, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal, Input, Select, Button } from '@/components/ui'
 import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { ASSET_CLASS_OPTIONS } from '@/lib/constants'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
-import { TOP_STOCKS } from './topStocks'
-import { TOP_CRYPTO } from './topCrypto'
 import type { AssetClass } from '@/types'
 import type { GlobalAsset } from './assetTypes'
 
-type Tab = 'stocks' | 'crypto' | 'manual'
+type Tab = 'stock' | 'crypto' | 'etf' | 'metal' | 'manual'
 
 const TABS: { id: Tab; label: string; emoji: string }[] = [
-  { id: 'stocks', label: 'Stocks', emoji: '📊' },
+  { id: 'stock', label: 'Stocks', emoji: '📊' },
   { id: 'crypto', label: 'Crypto', emoji: '🪙' },
+  { id: 'etf', label: 'ETFs', emoji: '📈' },
+  { id: 'metal', label: 'Metals', emoji: '🥇' },
   { id: 'manual', label: 'Manual', emoji: '✏️' },
 ]
 
@@ -58,7 +58,7 @@ function AssetPickRow({
         <div className="min-w-0">
           <p className="text-data-sm font-medium text-ink truncate">{asset.name}</p>
           <p className="text-data-xs text-ink-faint font-mono">
-            {asset.symbol}
+            {asset.symbol} · {asset.type.toUpperCase()}
           </p>
         </div>
       </div>
@@ -113,8 +113,10 @@ export function AddAssetModal() {
 
   const isOpen = activeModal === 'add-asset'
 
-  const [tab, setTab] = useState<Tab>('stocks')
+  const [tab, setTab] = useState<Tab>('stock')
   const [search, setSearch] = useState('')
+  const [results, setResults] = useState<GlobalAsset[]>([])
+  const [loading, setLoading] = useState(false)
   const [manualForm, setManualForm] = useState(initialManualState)
   const [selectedCatalogAsset, setSelectedCatalogAsset] = useState<GlobalAsset | null>(null)
 
@@ -125,8 +127,10 @@ export function AddAssetModal() {
   useEffect(() => {
     if (!isOpen) return
 
-    setTab('stocks')
+    setTab('stock')
     setSearch('')
+    setResults([])
+    setLoading(false)
     setManualForm(initialManualState)
     setSelectedCatalogAsset(null)
     setOwnedQuantity('')
@@ -134,23 +138,50 @@ export function AddAssetModal() {
     setError(null)
   }, [isOpen])
 
-  const query = search.trim().toLowerCase()
+  useEffect(() => {
+    if (!isOpen) return
+    if (tab === 'manual') return
 
-  const filteredStocks = TOP_STOCKS.filter(
-    (a) =>
-      !query ||
-      a.symbol.toLowerCase().includes(query) ||
-      a.name.toLowerCase().includes(query)
-  )
+    const query = search.trim()
 
-  const filteredCrypto = TOP_CRYPTO.filter(
-    (a) =>
-      !query ||
-      a.symbol.toLowerCase().includes(query) ||
-      a.name.toLowerCase().includes(query)
-  )
+    if (query.length < 2) {
+      setResults([])
+      setLoading(false)
+      return
+    }
 
-  const currentList = tab === 'stocks' ? filteredStocks : filteredCrypto
+    let cancelled = false
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        setLoading(true)
+
+        const params = new URLSearchParams({
+          q: query,
+          type: tab,
+        })
+
+        const res = await fetch(`/api/search-assets?${params.toString()}`, {
+          cache: 'no-store',
+        })
+
+        const data = await res.json()
+
+        if (!cancelled) {
+          setResults(Array.isArray(data.assets) ? data.assets : [])
+        }
+      } catch {
+        if (!cancelled) setResults([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [isOpen, search, tab])
 
   const ownedQuantityNum = parseFloat(ownedQuantity) || 0
   const ownedValueNum = parseFloat(ownedValue) || 0
@@ -222,15 +253,23 @@ export function AddAssetModal() {
   const activeCurrency = displayCurrency
   const prefix = getPrefix(activeCurrency)
 
+  function getPlaceholder() {
+    if (tab === 'stock') return 'Apple, Tesla, ASML, SAP…'
+    if (tab === 'crypto') return 'Bitcoin, Ethereum, Solana…'
+    if (tab === 'etf') return 'MSCI World, S&P 500, Vanguard…'
+    if (tab === 'metal') return 'Gold, Silver, Platinum…'
+    return 'Suchen…'
+  }
+
   return (
     <Modal
       open={isOpen}
       onClose={closeModal}
       title="Asset hinzufügen"
-      description="Wähle ein Asset aus und trage ein, wie viel du aktuell besitzt."
+      description="Suche Aktien, ETFs, Krypto oder Metalle und trage ein, wie viel du aktuell besitzt."
       maxWidth="md"
     >
-      <div className="flex gap-1 p-1 rounded-lg bg-surface-raised border border-border mb-4">
+      <div className="flex gap-1 p-1 rounded-lg bg-surface-raised border border-border mb-4 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -238,11 +277,12 @@ export function AddAssetModal() {
             onClick={() => {
               setTab(t.id)
               setSearch('')
+              setResults([])
               setSelectedCatalogAsset(null)
               setError(null)
             }}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md',
+              'flex-1 min-w-fit flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md',
               'text-data-sm font-medium transition-all duration-150',
               tab === t.id
                 ? 'bg-surface-elevated text-ink shadow-sm border border-border'
@@ -255,23 +295,32 @@ export function AddAssetModal() {
         ))}
       </div>
 
-      {(tab === 'stocks' || tab === 'crypto') && (
+      {tab !== 'manual' && (
         <form onSubmit={handleCatalogSubmit} className="space-y-4">
           {!selectedCatalogAsset ? (
             <>
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder={tab === 'stocks' ? 'AAPL, Apple…' : 'BTC, Bitcoin…'}
+                placeholder={getPlaceholder()}
               />
 
               <div className="space-y-1 max-h-80 overflow-y-auto pr-0.5">
-                {currentList.length === 0 ? (
+                {search.trim().length < 2 ? (
+                  <div className="py-8 text-center text-data-sm text-ink-faint">
+                    Gib mindestens 2 Zeichen ein, um über Twelve Data zu suchen.
+                  </div>
+                ) : loading ? (
+                  <div className="py-8 flex items-center justify-center gap-2 text-data-sm text-ink-muted">
+                    <Loader2 size={16} className="animate-spin" />
+                    Suche läuft…
+                  </div>
+                ) : results.length === 0 ? (
                   <div className="py-8 text-center text-data-sm text-ink-faint">
                     Keine Ergebnisse für „{search}"
                   </div>
                 ) : (
-                  currentList.map((asset) => (
+                  results.map((asset) => (
                     <AssetPickRow
                       key={asset.id}
                       asset={asset}
@@ -281,12 +330,10 @@ export function AddAssetModal() {
                 )}
               </div>
 
-              {!search && (
-                <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
-                  <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
-                  Wähle ein Asset aus und trage danach deinen aktuellen Bestand in {displayCurrency} ein.
-                </p>
-              )}
+              <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
+                <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
+                Werte werden in deiner gewählten Währung {displayCurrency} gespeichert.
+              </p>
             </>
           ) : (
             <>
@@ -295,7 +342,7 @@ export function AddAssetModal() {
                   {selectedCatalogAsset.name}
                 </p>
                 <p className="text-data-xs text-ink-faint font-mono">
-                  {selectedCatalogAsset.symbol} · Eingabe in {displayCurrency}
+                  {selectedCatalogAsset.symbol} · {selectedCatalogAsset.type.toUpperCase()} · Eingabe in {displayCurrency}
                 </p>
 
                 <button
@@ -350,7 +397,7 @@ export function AddAssetModal() {
             onChange={(e) =>
               setManualForm((f) => ({ ...f, ticker: e.target.value.toUpperCase() }))
             }
-            maxLength={12}
+            maxLength={16}
             autoFocus
             required
           />
