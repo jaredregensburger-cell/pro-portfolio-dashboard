@@ -3,27 +3,56 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useUIStore } from '@/store'
+
+type DemoAccount = {
+  name: string
+  email: string
+  password: string
+  registeredAt: string
+}
 
 export default function LoginPage() {
   const router = useRouter()
+  const setProfile = useUIStore((s) => s.setProfile)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    setError(null)
 
-    if (!email.trim() || !password.trim()) {
-      alert('Bitte E-Mail und Passwort eingeben.')
+    const rawAccount = localStorage.getItem('folio-demo-account')
+
+    if (!rawAccount) {
+      setError('Es wurde noch kein Account erstellt.')
+      return
+    }
+
+    const account = JSON.parse(rawAccount) as DemoAccount
+
+    if (
+      account.email.toLowerCase() !== email.trim().toLowerCase() ||
+      account.password !== password
+    ) {
+      setError('E-Mail oder Passwort ist falsch.')
       return
     }
 
     localStorage.setItem(
-      'folio-demo-user',
+      'folio-demo-session',
       JSON.stringify({
-        email,
+        email: account.email,
         loggedInAt: new Date().toISOString(),
       })
     )
+
+    setProfile({
+      displayName: account.name,
+      email: account.email,
+    })
 
     router.push('/dashboard' as any)
   }
@@ -58,6 +87,12 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2 text-ink"
           />
+
+          {error && (
+            <p className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-data-sm text-loss">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
