@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Sidebar } from './Sidebar'
 import { MobileSidebar } from './MobileSidebar'
 import { Topbar } from './Topbar'
@@ -22,8 +23,14 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, title, subtitle, topbarActions }: AppShellProps) {
-  const { sidebar } = useUIStore()
+  const sidebar = useUIStore((s) => s.sidebar)
+  const syncDemoUser = useUIStore((s) => s.syncDemoUser)
+
   const isCollapsed = sidebar === 'collapsed'
+
+  useEffect(() => {
+    syncDemoUser()
+  }, [syncDemoUser])
 
   return (
     <OnboardingGate>
@@ -40,6 +47,7 @@ export function AppShell({ children, title, subtitle, topbarActions }: AppShellP
             )}
           >
             <Topbar title={title} subtitle={subtitle} actions={topbarActions} />
+
             <main className="flex-1 p-4 sm:p-6 overflow-auto animate-fade-in">
               {children}
             </main>
