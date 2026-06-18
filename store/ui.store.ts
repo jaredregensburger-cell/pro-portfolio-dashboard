@@ -18,9 +18,23 @@ interface UIState {
   toggleSidebar: () => void
   setCurrency: (currency: string) => void
   setProfile: (input: { displayName?: string; email?: string }) => void
+  syncDemoUser: () => void
+  resetUser: () => void
   openMobileSidebar: () => void
   closeMobileSidebar: () => void
   toggleMobileSidebar: () => void
+}
+
+function getStoredDemoUser(): { name?: string; displayName?: string; email?: string } | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = localStorage.getItem('folio-demo-user')
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 export const useUIStore = create<UIState>()(
@@ -29,15 +43,17 @@ export const useUIStore = create<UIState>()(
       theme: 'dark',
       sidebar: 'expanded',
       currency: 'USD',
-      displayName: 'Alex Investor',
-      email: 'alex@folio.app',
+      displayName: 'Investor',
+      email: '',
       mobileSidebarOpen: false,
 
       setTheme: (theme) => set({ theme }),
+
       toggleTheme: () =>
         set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
 
       setSidebar: (sidebar) => set({ sidebar }),
+
       toggleSidebar: () =>
         set({ sidebar: get().sidebar === 'expanded' ? 'collapsed' : 'expanded' }),
 
@@ -45,9 +61,31 @@ export const useUIStore = create<UIState>()(
 
       setProfile: ({ displayName, email }) =>
         set((state) => ({
-          displayName: displayName ?? state.displayName,
-          email: email ?? state.email,
+          displayName: displayName?.trim() || state.displayName,
+          email: email?.trim() || state.email,
         })),
+
+      syncDemoUser: () => {
+        const user = getStoredDemoUser()
+        if (!user) return
+
+        const name = user.displayName || user.name
+
+        set((state) => ({
+          displayName: name?.trim() || state.displayName || 'Investor',
+          email: user.email?.trim() || state.email,
+        }))
+      },
+
+      resetUser: () =>
+        set({
+          displayName: 'Investor',
+          email: '',
+          currency: 'USD',
+          sidebar: 'expanded',
+          theme: 'dark',
+          mobileSidebarOpen: false,
+        }),
 
       openMobileSidebar: () => set({ mobileSidebarOpen: true }),
       closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
