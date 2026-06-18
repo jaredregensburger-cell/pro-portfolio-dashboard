@@ -155,7 +155,13 @@ export function SettingsShell() {
         )}
 
         <div className="mt-4 pt-4 border-t border-border flex justify-end">
-          <Button variant="primary" size="sm">Save Changes</Button>
+          <Button
+  variant="primary"
+  size="sm"
+  onClick={() => showInfoToast('Gespeichert', 'Deine Einstellungen wurden gespeichert.')}
+>
+  Save Changes
+</Button>
         </div>
       </GlassCard>
 
