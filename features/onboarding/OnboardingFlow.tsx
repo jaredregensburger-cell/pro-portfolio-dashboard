@@ -2,41 +2,24 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui'
 import { useOnboardingStore, useSimulationStore } from '@/store'
+import { useUIStore } from '@/store'
+import { useAuthStore } from '@/features/auth/AuthStore'
 import { OnboardingOptionCard } from './OnboardingOptionCard'
 import { OnboardingProgress } from './OnboardingProgress'
 import type { InvestorType, InvestorProfile } from '@/types/simulation'
 import { ArrowLeft, ArrowRight, Zap, Sparkles } from 'lucide-react'
 
-const STEPS = ['investorType', 'primaryGoal', 'experienceLevel'] as const
+const STEPS = ['investorType', 'primaryGoal', 'experienceLevel', 'account'] as const
 type Step = (typeof STEPS)[number]
 
 const INVESTOR_TYPES: Array<{ value: InvestorType; icon: string; title: string; description: string }> = [
-  {
-    value: 'conservative',
-    icon: '🛡️',
-    title: 'Konservativ',
-    description: 'Kapitalerhalt steht an erster Stelle. Niedrige Volatilität, stabile Erträge.',
-  },
-  {
-    value: 'balanced',
-    icon: '⚖️',
-    title: 'Ausgewogen',
-    description: 'Mix aus Wachstum und Sicherheit. Moderates Risiko für moderate Renditen.',
-  },
-  {
-    value: 'growth',
-    icon: '🌱',
-    title: 'Wachstum',
-    description: 'Langfristiger Vermögensaufbau. Höheres Risiko für höheres Renditepotenzial.',
-  },
-  {
-    value: 'aggressive',
-    icon: '🚀',
-    title: 'Aggressiv',
-    description: 'Maximales Wachstum. Hohe Volatilität und Risikobereitschaft akzeptiert.',
-  },
+  { value: 'conservative', icon: '🛡️', title: 'Konservativ', description: 'Kapitalerhalt steht an erster Stelle. Niedrige Volatilität, stabile Erträge.' },
+  { value: 'balanced', icon: '⚖️', title: 'Ausgewogen', description: 'Mix aus Wachstum und Sicherheit. Moderates Risiko für moderate Renditen.' },
+  { value: 'growth', icon: '🌱', title: 'Wachstum', description: 'Langfristiger Vermögensaufbau. Höheres Risiko für höheres Renditepotenzial.' },
+  { value: 'aggressive', icon: '🚀', title: 'Aggressiv', description: 'Maximales Wachstum. Hohe Volatilität und Risikobereitschaft akzeptiert.' },
 ]
 
 const PRIMARY_GOALS: Array<{ value: string; icon: string; title: string; description: string }> = [
@@ -59,14 +42,22 @@ const EXPERIENCE_LEVELS: Array<{
 
 export function OnboardingFlow() {
   const router = useRouter()
+
   const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding)
-  const skipOnboarding = useOnboardingStore((s) => s.skipOnboarding)
   const loadDemoData = useSimulationStore((s) => s.loadDemoData)
+  const setProfile = useUIStore((s) => s.setProfile)
+  const signUp = useAuthStore((s) => s.signUp)
+  const loading = useAuthStore((s) => s.loading)
 
   const [stepIndex, setStepIndex] = useState(0)
   const [investorType, setInvestorType] = useState<InvestorType | null>(null)
   const [primaryGoal, setPrimaryGoal] = useState<string | null>(null)
   const [experienceLevel, setExperienceLevel] = useState<InvestorProfile['experienceLevel'] | null>(null)
+
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const currentStep: Step = STEPS[stepIndex]
   const isLastStep = stepIndex === STEPS.length - 1
@@ -74,18 +65,43 @@ export function OnboardingFlow() {
   const canProceed =
     (currentStep === 'investorType' && investorType !== null) ||
     (currentStep === 'primaryGoal' && primaryGoal !== null) ||
-    (currentStep === 'experienceLevel' && experienceLevel !== null)
+    (currentStep === 'experienceLevel' && experienceLevel !== null) ||
+    (currentStep === 'account' && displayName.trim() && email.trim() && password.length >= 6)
 
-  function handleNext() {
-    if (!canProceed) return
+  async function finishRegistration() {
+    setError(null)
 
-    if (isLastStep) {
+    try {
+      await signUp({
+        email,
+        password,
+        displayName,
+        metadata: {
+          investor_type: investorType,
+          primary_goal: primaryGoal,
+          experience_level: experienceLevel,
+        },
+      })
+
+      setProfile({ displayName, email })
+
       completeOnboarding({
         investorType: investorType!,
         primaryGoal: primaryGoal!,
         experienceLevel: experienceLevel!,
       })
+
       router.replace('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen')
+    }
+  }
+
+  function handleNext() {
+    if (!canProceed) return
+
+    if (isLastStep) {
+      finishRegistration()
       return
     }
 
@@ -96,21 +112,13 @@ export function OnboardingFlow() {
     setStepIndex((i) => Math.max(0, i - 1))
   }
 
-  function handleSkip() {
-    skipOnboarding()
-    router.replace('/dashboard')
-  }
-
-  function handleSkipWithDemo() {
-    skipOnboarding()
+  function handleDemo() {
     loadDemoData()
-    router.replace('/dashboard')
   }
 
   return (
     <div className="min-h-screen bg-void flex flex-col items-center justify-center px-4 py-12 bg-grid">
       <div className="w-full max-w-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-signal-gradient">
@@ -118,17 +126,17 @@ export function OnboardingFlow() {
             </div>
             <span className="font-semibold text-ink">Folio</span>
           </div>
-          <button
-            onClick={handleSkip}
+
+          <Link
+            href="/login"
             className="text-data-sm text-ink-faint hover:text-ink-muted transition-colors duration-150"
           >
-            Überspringen
-          </button>
+            Ich habe schon einen Account
+          </Link>
         </div>
 
         <OnboardingProgress step={stepIndex} totalSteps={STEPS.length} />
 
-        {/* Step content */}
         <div className="mt-8 animate-fade-in" key={currentStep}>
           {currentStep === 'investorType' && (
             <>
@@ -182,7 +190,7 @@ export function OnboardingFlow() {
                 Wie viel Erfahrung hast du?
               </h1>
               <p className="text-data-base text-ink-muted mb-6">
-                Letzter Schritt — danach geht's direkt ins Dashboard.
+                Danach erstellen wir deinen Account.
               </p>
               <div className="grid grid-cols-1 gap-3">
                 {EXPERIENCE_LEVELS.map((e) => (
@@ -198,9 +206,65 @@ export function OnboardingFlow() {
               </div>
             </>
           )}
+
+          {currentStep === 'account' && (
+            <>
+              <h1 className="text-data-3xl font-semibold text-ink mb-2">
+                Account erstellen
+              </h1>
+              <p className="text-data-base text-ink-muted mb-6">
+                Danach kommst du direkt zu deinem Dashboard.
+              </p>
+
+              <div className="space-y-4 rounded-2xl border border-border bg-surface/90 p-5">
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    Name
+                  </label>
+                  <input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
+                    Passwort
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal"
+                  />
+                  <p className="mt-1 text-data-xs text-ink-faint">
+                    Mindestens 6 Zeichen.
+                  </p>
+                </div>
+
+                {error && (
+                  <p className="rounded-lg border border-loss/30 bg-loss/10 px-3 py-2 text-data-sm text-loss">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Footer actions */}
         <div className="flex items-center justify-between mt-8">
           <div>
             {stepIndex > 0 ? (
@@ -209,14 +273,15 @@ export function OnboardingFlow() {
                 Zurück
               </Button>
             ) : (
-              <Button variant="ghost" onClick={handleSkipWithDemo}>
+              <Button variant="ghost" onClick={handleDemo}>
                 <Sparkles size={14} strokeWidth={2} />
-                Mit Demo-Daten starten
+                Demo-Daten vormerken
               </Button>
             )}
           </div>
-          <Button variant="primary" onClick={handleNext} disabled={!canProceed}>
-            {isLastStep ? 'Fertig' : 'Weiter'}
+
+          <Button variant="primary" onClick={handleNext} disabled={!canProceed || loading}>
+            {isLastStep ? (loading ? 'Erstelle Account…' : 'Account erstellen') : 'Weiter'}
             <ArrowRight size={14} strokeWidth={2} />
           </Button>
         </div>
