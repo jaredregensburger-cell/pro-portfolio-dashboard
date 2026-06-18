@@ -25,6 +25,7 @@ export function AssetsShell() {
   const { livePrices } = useLiveMarketDataContext()
   const removeAsset = useSimulationStore((s) => s.removeAsset)
   const openModal = useModalStore((s) => s.openModal)
+  const currency = useUIStore((s) => s.currency)
 
   if (!hasHydrated) {
     return <SkeletonTable rows={6} />
