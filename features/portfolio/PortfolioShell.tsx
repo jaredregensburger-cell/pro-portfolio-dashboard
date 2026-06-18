@@ -15,6 +15,7 @@ export function PortfolioShell() {
   const { livePrices } = useLiveMarketDataContext()
   const openModal = useModalStore((s) => s.openModal)
   const loadDemoData = useSimulationStore((s) => s.loadDemoData)
+  const currency = useUIStore((s) => s.currency)
 
   if (!hasHydrated) {
     return (
