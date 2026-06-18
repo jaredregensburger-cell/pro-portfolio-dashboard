@@ -61,13 +61,26 @@ export function SettingsShell() {
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
 
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
+  function handleSave() {
+    showInfoToast('Gespeichert', `Deine Einstellungen wurden gespeichert. Aktuelle Währung: ${currency}`)
+  }
+
   function handleReset() {
     if (!confirmingReset) {
       setConfirmingReset(true)
       return
     }
+
     resetSimulation()
     setConfirmingReset(false)
+    showInfoToast('Daten zurückgesetzt', 'Alle lokalen Portfolio-Daten wurden entfernt.')
   }
 
   function handleDeletePortfolio(id: string, name: string) {
@@ -75,6 +88,7 @@ export function SettingsShell() {
       setConfirmingDeleteId(id)
       return
     }
+
     removePortfolio(id)
     showInfoToast('Portfolio gelöscht', `"${name}" und alle zugehörigen Daten wurden entfernt.`)
     setConfirmingDeleteId(null)
@@ -86,19 +100,24 @@ export function SettingsShell() {
   }
 
   function commitRename() {
-    if (editingPortfolioId) renamePortfolio(editingPortfolioId, editName)
+    if (editingPortfolioId && editName.trim()) {
+      renamePortfolio(editingPortfolioId, editName.trim())
+      showInfoToast('Portfolio umbenannt', 'Der neue Name wurde gespeichert.')
+    }
+
     setEditingPortfolioId(null)
   }
 
   return (
     <div className="max-w-4xl space-y-6 animate-fade-in">
-      {/* Section Nav */}
-      <div className="flex gap-1 flex-wrap overflow-x-auto scrollbar-none -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
+      <div className="sticky top-0 z-10 flex gap-1 flex-wrap overflow-x-auto scrollbar-none -mx-1 px-1 py-2 bg-void/80 backdrop-blur sm:overflow-visible sm:mx-0 sm:px-0">
         {SETTINGS_SECTIONS.map((s) => {
           const Icon = s.icon
+
           return (
             <button
               key={s.id}
+              onClick={() => scrollToSection(s.id)}
               className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-data-sm text-ink-muted hover:text-ink hover:bg-surface-raised border border-transparent hover:border-border transition-all duration-150"
             >
               <Icon size={14} strokeWidth={1.75} />
@@ -108,8 +127,7 @@ export function SettingsShell() {
         })}
       </div>
 
-      {/* Profile Section */}
-      <GlassCard accent="signal">
+      <GlassCard id="profile" accent="signal" className="scroll-mt-20">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-data-base font-semibold text-ink">Profile</h2>
@@ -119,6 +137,7 @@ export function SettingsShell() {
           </div>
           <Badge variant="signal" size="sm">Active</Badge>
         </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { label: 'Display Name', placeholder: 'Alex Investor' },
@@ -142,8 +161,12 @@ export function SettingsShell() {
             <span className="text-data-xs text-ink-faint uppercase tracking-wide">
               Investor-Profil
             </span>
-            <Badge variant="violet" size="sm">{INVESTOR_TYPE_LABELS[profile.investorType]}</Badge>
-            <Badge variant="muted" size="sm">{profile.experienceLevel}</Badge>
+            <Badge variant="violet" size="sm">
+              {INVESTOR_TYPE_LABELS[profile.investorType]}
+            </Badge>
+            <Badge variant="muted" size="sm">
+              {profile.experienceLevel}
+            </Badge>
             <button
               onClick={resetOnboarding}
               className="ml-auto flex items-center gap-1.5 text-data-xs text-ink-faint hover:text-ink transition-colors duration-150"
@@ -155,18 +178,13 @@ export function SettingsShell() {
         )}
 
         <div className="mt-4 pt-4 border-t border-border flex justify-end">
-          <Button
-  variant="primary"
-  size="sm"
-  onClick={() => showInfoToast('Gespeichert', 'Deine Einstellungen wurden gespeichert.')}
->
-  Save Changes
-</Button>
+          <Button variant="primary" size="sm" onClick={handleSave}>
+            Save Changes
+          </Button>
         </div>
       </GlassCard>
 
-      {/* Portfolios */}
-      <GlassCard padding="none">
+      <GlassCard id="portfolios" padding="none" className="scroll-mt-20">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
             <h2 className="text-data-base font-semibold text-ink">Portfolios</h2>
@@ -211,16 +229,19 @@ export function SettingsShell() {
                     <div className="flex-1 min-w-0">
                       <p className="text-data-sm font-medium text-ink truncate">{p.name}</p>
                       <p className="text-data-xs text-ink-faint">
-                        {assetCount} {assetCount === 1 ? 'Asset' : 'Assets'} · {p.currency}
+                        {assetCount} {assetCount === 1 ? 'Asset' : 'Assets'} · {currency}
                       </p>
                     </div>
+
                     {isActive && <Badge variant="signal" size="sm">Aktiv</Badge>}
+
                     <div className="flex items-center gap-1 shrink-0">
                       {!isActive && (
                         <Button variant="ghost" size="sm" onClick={() => setActivePortfolio(p.id)}>
                           Wechseln
                         </Button>
                       )}
+
                       <Button
                         variant="ghost"
                         size="icon"
@@ -229,6 +250,7 @@ export function SettingsShell() {
                       >
                         <Pencil size={13} strokeWidth={2} />
                       </Button>
+
                       {portfolios.length > 1 && (
                         <Button
                           variant="ghost"
@@ -250,10 +272,24 @@ export function SettingsShell() {
         </div>
       </GlassCard>
 
-      {/* Preferences */}
-      <GlassCard>
+      <GlassCard id="notifications" className="scroll-mt-20">
+        <h2 className="text-data-base font-semibold text-ink mb-1">Notifications</h2>
+        <p className="text-data-sm text-ink-muted">
+          Notifications are not connected yet.
+        </p>
+      </GlassCard>
+
+      <GlassCard id="security" className="scroll-mt-20">
+        <h2 className="text-data-base font-semibold text-ink mb-1">Security</h2>
+        <p className="text-data-sm text-ink-muted">
+          Security settings are managed by your authentication provider.
+        </p>
+      </GlassCard>
+
+      <GlassCard id="appearance" className="scroll-mt-20">
         <h2 className="text-data-base font-semibold text-ink mb-1">Preferences</h2>
         <p className="text-data-sm text-ink-muted mb-5">Display & currency settings</p>
+
         <div className="space-y-4">
           <div>
             <label className="block text-data-xs font-medium text-ink-muted uppercase tracking-wide mb-2">
@@ -261,7 +297,10 @@ export function SettingsShell() {
             </label>
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              onChange={(e) => {
+                setCurrency(e.target.value)
+                showInfoToast('Währung geändert', `Anzeige-Währung: ${e.target.value}`)
+              }}
               className="rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-data-sm text-ink focus:outline-none focus:border-signal focus:ring-1 focus:ring-signal transition-colors duration-150 cursor-pointer"
             >
               {CURRENCIES.map((c) => (
@@ -270,12 +309,14 @@ export function SettingsShell() {
                 </option>
               ))}
             </select>
+            <p className="mt-2 text-data-xs text-ink-faint">
+              Hinweis: Diese Auswahl ändert die Anzeige-Währung. Für echte Umrechnung braucht die App Wechselkurse.
+            </p>
           </div>
         </div>
       </GlassCard>
 
-      {/* Simulation Data */}
-      <GlassCard accent="violet">
+      <GlassCard id="data" accent="violet" className="scroll-mt-20">
         <div className="flex items-start justify-between gap-4 mb-1">
           <div>
             <h2 className="text-data-base font-semibold text-ink">Simulation Data</h2>
@@ -320,7 +361,13 @@ export function SettingsShell() {
         </div>
       </GlassCard>
 
-      {/* Danger Zone */}
+      <GlassCard id="billing" className="scroll-mt-20">
+        <h2 className="text-data-base font-semibold text-ink mb-1">Billing</h2>
+        <p className="text-data-sm text-ink-muted">
+          Billing is not connected yet.
+        </p>
+      </GlassCard>
+
       <GlassCard accent="loss">
         <h2 className="text-data-base font-semibold text-ink mb-1">Danger Zone</h2>
         <p className="text-data-sm text-ink-muted mb-4">
