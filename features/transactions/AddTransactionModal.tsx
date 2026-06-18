@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Modal, Input, Select, Button, SegmentedControl, EmptyState } from '@/components/ui'
 import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
+import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { computeAssetPosition } from '@/lib/calculations'
 import { showSuccessToast } from '@/store/toast.store'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -20,16 +21,14 @@ export function AddTransactionModal() {
   const currency = useUIStore((s) => s.currency)
 
   const { assets, transactions } = useActivePortfolioData()
+  const { livePrices } = useLiveMarketDataContext()
   const addTransaction = useSimulationStore((s) => s.addTransaction)
 
   const isOpen = activeModal === 'add-transaction'
 
   const [assetId, setAssetId] = useState('')
   const [type, setType] = useState<SimTransactionType>('buy')
-  const [amount, setAmount] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [fee, setFee] = useState('0')
-  const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -39,10 +38,7 @@ export function AddTransactionModal() {
 
     setAssetId(initialAssetId)
     setType(context.type ?? 'buy')
-    setAmount('')
     setQuantity('')
-    setFee('0')
-    setNote('')
     setError(null)
   }, [isOpen, context.assetId, context.type, assets])
 
@@ -50,25 +46,20 @@ export function AddTransactionModal() {
 
   const position = useMemo(() => {
     if (!selectedAsset) return null
-    return computeAssetPosition(selectedAsset, transactions)
-  }, [selectedAsset, transactions])
+    return computeAssetPosition(selectedAsset, transactions, livePrices)
+  }, [selectedAsset, transactions, livePrices])
 
-  const amountNum = parseFloat(amount) || 0
   const quantityNum = parseFloat(quantity) || 0
-  const feeNum = parseFloat(fee) || 0
 
-  const effectiveAmount =
-    type === 'buy'
-      ? Math.max(amountNum - feeNum, 0)
-      : amountNum
+  const livePrice =
+    selectedAsset ? livePrices.get(selectedAsset.ticker) : undefined
 
-  const calculatedPrice =
-    quantityNum > 0 ? effectiveAmount / quantityNum : 0
+  const transactionPrice =
+    livePrice && livePrice > 0
+      ? livePrice
+      : position?.currentPrice ?? 0
 
-  const netAmount =
-    type === 'buy'
-      ? effectiveAmount + feeNum
-      : effectiveAmount - feeNum
+  const estimatedValue = quantityNum * transactionPrice
 
   function handleClose() {
     closeModal()
@@ -77,13 +68,8 @@ export function AddTransactionModal() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
 
-    if (!assetId) {
+    if (!assetId || !selectedAsset) {
       setError('Bitte wähle ein Asset.')
-      return
-    }
-
-    if (amountNum <= 0) {
-      setError(type === 'buy' ? 'Dazugekauft für muss größer als 0 sein.' : 'Verkauft für muss größer als 0 sein.')
       return
     }
 
@@ -92,13 +78,13 @@ export function AddTransactionModal() {
       return
     }
 
-    if (calculatedPrice <= 0) {
-      setError('Der berechnete Preis muss größer als 0 sein.')
+    if (type === 'sell' && position?.hasPosition && quantityNum > position.quantity) {
+      setError(`Du kannst maximal ${formatNumber(position.quantity, 8)} ${selectedAsset.ticker} verkaufen.`)
       return
     }
 
-    if (type === 'sell' && position?.hasPosition && quantityNum > position.quantity) {
-      setError(`Du kannst maximal ${formatNumber(position.quantity, 8)} ${selectedAsset?.ticker} verkaufen.`)
+    if (transactionPrice <= 0) {
+      setError('Für dieses Asset ist noch kein Kurs verfügbar.')
       return
     }
 
@@ -106,10 +92,10 @@ export function AddTransactionModal() {
       assetId,
       type,
       quantity: quantityNum,
-      price: calculatedPrice,
-      fee: feeNum,
+      price: transactionPrice,
+      fee: 0,
       executedAt: new Date().toISOString(),
-      note: note.trim() || undefined,
+      note: type === 'buy' ? 'Dazugekauft' : 'Verkauft',
     })
 
     if (!result.success) {
@@ -119,7 +105,7 @@ export function AddTransactionModal() {
 
     showSuccessToast(
       type === 'buy' ? 'Kauf erfasst' : 'Verkauf erfasst',
-      `${formatNumber(quantityNum, 8)} ${selectedAsset?.ticker ?? ''} · ${formatCurrency(netAmount, currency)}`
+      `${formatNumber(quantityNum, 8)} ${selectedAsset.ticker} · ${formatCurrency(estimatedValue, currency)}`
     )
 
     handleClose()
@@ -127,7 +113,7 @@ export function AddTransactionModal() {
 
   if (isOpen && assets.length === 0) {
     return (
-      <Modal open={isOpen} onClose={handleClose} title="Transaktion erfassen">
+      <Modal open={isOpen} onClose={handleClose} title="Bestand ändern">
         <EmptyState
           icon={PackagePlus}
           title="Noch keine Assets"
@@ -145,8 +131,8 @@ export function AddTransactionModal() {
     <Modal
       open={isOpen}
       onClose={handleClose}
-      title="Transaktion erfassen"
-      description="Trage ein, wie viel du dazugekauft oder verkauft hast."
+      title="Bestand ändern"
+      description="Trage nur ein, wie viel du dazugekauft oder verkauft hast."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
@@ -168,117 +154,60 @@ export function AddTransactionModal() {
         />
 
         {selectedAsset && position && (
-          <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5 border border-border">
-            <div className="flex items-center gap-2">
-              <span
-                className="px-2 py-0.5 rounded-md text-data-xs font-mono font-medium"
-                style={{
-                  backgroundColor: ASSET_CLASS_META[selectedAsset.assetClass].bgColor,
-                  color: ASSET_CLASS_META[selectedAsset.assetClass].color,
-                }}
-              >
-                {selectedAsset.ticker}
-              </span>
-              <span className="text-data-sm text-ink-muted">Aktueller Bestand</span>
+          <div className="rounded-lg bg-surface px-3 py-3 border border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="px-2 py-0.5 rounded-md text-data-xs font-mono font-medium"
+                  style={{
+                    backgroundColor: ASSET_CLASS_META[selectedAsset.assetClass].bgColor,
+                    color: ASSET_CLASS_META[selectedAsset.assetClass].color,
+                  }}
+                >
+                  {selectedAsset.ticker}
+                </span>
+                <span className="text-data-sm text-ink-muted">Aktueller Bestand</span>
+              </div>
+
+              <p className="font-mono text-data-sm text-ink">
+                {formatNumber(position.quantity, 8)} {selectedAsset.ticker}
+              </p>
             </div>
 
-            <div className="text-right">
-              {position.hasPosition ? (
-                <p className="font-mono text-data-sm text-ink">
-                  {formatNumber(position.quantity, 8)} @ Ø {formatCurrency(position.avgCostBasis, currency)}
-                </p>
-              ) : (
-                <p className="text-data-sm text-ink-faint">Keine Position</p>
-              )}
+            <div className="flex items-center justify-between">
+              <span className="text-data-xs text-ink-muted uppercase tracking-wide">
+                Aktueller Kurs
+              </span>
+              <p className="font-mono text-data-sm text-ink">
+                {transactionPrice > 0 ? formatCurrency(transactionPrice, currency) : '—'}
+              </p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label={type === 'buy' ? 'Dazugekauft für' : 'Verkauft für'}
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min="0"
-            placeholder="0.00"
-            prefix={currency === 'EUR' ? '€' : '$'}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-
-          <Input
-            label={type === 'buy' ? 'Dazugekaufte Menge' : 'Verkaufte Menge'}
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min="0"
-            placeholder="0.00000000"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            hint={
-              type === 'sell' && position?.hasPosition
-                ? `Verfügbar: ${formatNumber(position.quantity, 8)}`
-                : undefined
-            }
-          />
-        </div>
-
         <Input
-          label="Gebühr optional"
+          label={type === 'buy' ? 'Dazugekaufte Menge' : 'Verkaufte Menge'}
           type="number"
           inputMode="decimal"
           step="any"
           min="0"
-          placeholder="0.00"
-          prefix={currency === 'EUR' ? '€' : '$'}
-          value={fee}
-          onChange={(e) => setFee(e.target.value)}
+          placeholder="0.00000000"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          hint={
+            type === 'sell' && position?.hasPosition
+              ? `Verfügbar: ${formatNumber(position.quantity, 8)} ${selectedAsset?.ticker ?? ''}`
+              : undefined
+          }
         />
 
-        <Input
-          label="Notiz optional"
-          placeholder="z. B. Kraken Kauf"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          maxLength={120}
-        />
-
-        <div className="rounded-lg bg-surface px-3 py-3 border border-border space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-data-xs text-ink-muted uppercase tracking-wide">
-              Berechneter Kurs
-            </p>
-            <p className="font-mono text-data-sm text-ink">
-              {calculatedPrice > 0 ? formatCurrency(calculatedPrice, currency) : '—'}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <p className="text-data-xs text-ink-muted uppercase tracking-wide">
-              Menge
-            </p>
-            <p className="font-mono text-data-sm text-ink">
-              {formatNumber(quantityNum, 8)} {selectedAsset?.ticker ?? ''}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-border pt-2">
-            <div>
-              <p className="text-data-xs text-ink-muted uppercase tracking-wide">
-                {type === 'buy' ? 'Gesamtkosten' : 'Erlös netto'}
-              </p>
-              {feeNum > 0 && (
-                <p className="text-data-xs text-ink-faint mt-0.5">
-                  Gebühr: {formatCurrency(feeNum, currency)}
-                </p>
-              )}
-            </div>
-
-            <p className="font-mono text-data-xl font-semibold text-ink">
-              {formatCurrency(netAmount, currency)}
-            </p>
-          </div>
+        <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-3 border border-border">
+          <p className="text-data-xs text-ink-muted uppercase tracking-wide">
+            Geschätzter Wert
+          </p>
+          <p className="font-mono text-data-xl font-semibold text-ink">
+            {formatCurrency(estimatedValue, currency)}
+          </p>
         </div>
 
         {error && (
