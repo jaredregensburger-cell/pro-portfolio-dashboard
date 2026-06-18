@@ -89,8 +89,8 @@ export function Sidebar({ variant = 'desktop' }: SidebarProps) {
           const Icon = item.icon
           return (
             <Link
-              key={item.href}
-              href={item.href}
+  key={item.href}
+  href={item.href as any}
               onClick={isMobile ? closeMobileSidebar : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5',
