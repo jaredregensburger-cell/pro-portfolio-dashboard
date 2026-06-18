@@ -6,29 +6,10 @@ import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { computeAssetPosition } from '@/lib/calculations'
 import { showSuccessToast } from '@/store/toast.store'
-import { formatCurrency, formatNumber, toDateInputValue } from '@/lib/utils'
+import { formatCurrency, formatNumber } from '@/lib/utils'
 import { ASSET_CLASS_META } from '@/lib/constants'
 import type { SimTransactionType } from '@/types/simulation'
 import { PackagePlus } from 'lucide-react'
-
-function currentTimeInputValue() {
-  const d = new Date()
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function dateTimeToIso(date: string, time: string) {
-  const [year, month, day] = date.split('-').map(Number)
-  const [hour, minute] = time.split(':').map(Number)
-
-  return new Date(
-    year,
-    (month ?? 1) - 1,
-    day ?? 1,
-    hour ?? 0,
-    minute ?? 0,
-    0
-  ).toISOString()
-}
 
 export function AddTransactionModal() {
   const activeModal = useModalStore((s) => s.activeModal)
@@ -48,8 +29,6 @@ export function AddTransactionModal() {
   const [amount, setAmount] = useState('')
   const [quantity, setQuantity] = useState('')
   const [fee, setFee] = useState('0')
-  const [date, setDate] = useState(toDateInputValue())
-  const [time, setTime] = useState(currentTimeInputValue())
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -63,8 +42,6 @@ export function AddTransactionModal() {
     setAmount('')
     setQuantity('')
     setFee('0')
-    setDate(toDateInputValue())
-    setTime(currentTimeInputValue())
     setNote('')
     setError(null)
   }, [isOpen, context.assetId, context.type, assets])
@@ -106,12 +83,12 @@ export function AddTransactionModal() {
     }
 
     if (amountNum <= 0) {
-      setError(type === 'buy' ? 'Investierter Betrag muss größer als 0 sein.' : 'Verkaufswert muss größer als 0 sein.')
+      setError(type === 'buy' ? 'Dazugekauft für muss größer als 0 sein.' : 'Verkauft für muss größer als 0 sein.')
       return
     }
 
     if (quantityNum <= 0) {
-      setError(type === 'buy' ? 'Erhaltene Menge muss größer als 0 sein.' : 'Verkaufte Menge muss größer als 0 sein.')
+      setError(type === 'buy' ? 'Dazugekaufte Menge muss größer als 0 sein.' : 'Verkaufte Menge muss größer als 0 sein.')
       return
     }
 
@@ -131,7 +108,7 @@ export function AddTransactionModal() {
       quantity: quantityNum,
       price: calculatedPrice,
       fee: feeNum,
-      executedAt: dateTimeToIso(date, time),
+      executedAt: new Date().toISOString(),
       note: note.trim() || undefined,
     })
 
@@ -169,7 +146,7 @@ export function AddTransactionModal() {
       open={isOpen}
       onClose={handleClose}
       title="Transaktion erfassen"
-      description="Gib Betrag und Menge ein — der Kurs wird automatisch berechnet."
+      description="Trage ein, wie viel du dazugekauft oder verkauft hast."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
@@ -219,7 +196,7 @@ export function AddTransactionModal() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
-            label={type === 'buy' ? 'Investierter Betrag' : 'Verkaufswert'}
+            label={type === 'buy' ? 'Dazugekauft für' : 'Verkauft für'}
             type="number"
             inputMode="decimal"
             step="any"
@@ -231,7 +208,7 @@ export function AddTransactionModal() {
           />
 
           <Input
-            label={type === 'buy' ? 'Erhaltene Menge' : 'Verkaufte Menge'}
+            label={type === 'buy' ? 'Dazugekaufte Menge' : 'Verkaufte Menge'}
             type="number"
             inputMode="decimal"
             step="any"
@@ -248,7 +225,7 @@ export function AddTransactionModal() {
         </div>
 
         <Input
-          label="Gebühr"
+          label="Gebühr optional"
           type="number"
           inputMode="decimal"
           step="any"
@@ -260,8 +237,8 @@ export function AddTransactionModal() {
         />
 
         <Input
-          label="Notiz (optional)"
-          placeholder="z. B. Kraken Einzahlung"
+          label="Notiz optional"
+          placeholder="z. B. Kraken Kauf"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={120}
@@ -303,10 +280,6 @@ export function AddTransactionModal() {
             </p>
           </div>
         </div>
-
-        <p className="text-data-xs text-ink-faint">
-          Ohne externe Kurs-API berechnet die App den Kurs aus Betrag ÷ Menge.
-        </p>
 
         {error && (
           <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2.5 text-data-sm text-loss">
