@@ -86,28 +86,36 @@ export function OnboardingFlow() {
       password.trim().length >= 6)
 
   function finishRegistration() {
-    localStorage.setItem(
-      'folio-demo-user',
-      JSON.stringify({
-        name: displayName.trim(),
-        email: email.trim(),
-        registeredAt: new Date().toISOString(),
-      })
-    )
-
-    setProfile({
-      displayName: displayName.trim(),
-      email: email.trim(),
-    })
-
-    completeOnboarding({
-      investorType: investorType!,
-      primaryGoal: primaryGoal!,
-      experienceLevel: experienceLevel!,
-    })
-
-    router.replace('/dashboard' as any)
+  const account = {
+    name: displayName.trim(),
+    email: email.trim(),
+    password: password,
+    registeredAt: new Date().toISOString(),
   }
+
+  localStorage.setItem('folio-demo-account', JSON.stringify(account))
+
+  localStorage.setItem(
+    'folio-demo-session',
+    JSON.stringify({
+      email: account.email,
+      loggedInAt: new Date().toISOString(),
+    })
+  )
+
+  setProfile({
+    displayName: account.name,
+    email: account.email,
+  })
+
+  completeOnboarding({
+    investorType: investorType!,
+    primaryGoal: primaryGoal!,
+    experienceLevel: experienceLevel!,
+  })
+
+  router.replace('/dashboard' as any)
+}
 
   function handleNext() {
     if (!canProceed) return
