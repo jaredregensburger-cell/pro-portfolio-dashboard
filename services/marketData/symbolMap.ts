@@ -1,6 +1,10 @@
 import type { AssetClass } from '@/types'
 
-export type MarketDataProvider = 'twelve-data'
+export type MarketDataProvider =
+  | 'twelve-data'
+  | 'coingecko'
+  | 'alphavantage'
+  | 'yahoo'
 
 export interface SymbolMapping {
   ticker: string
@@ -29,17 +33,15 @@ export function resolveSymbol(
 export function groupByProvider(
   assets: Array<{ ticker: string; assetClass: AssetClass }>
 ): Record<MarketDataProvider, SymbolMapping[]> {
-  const grouped: Record<MarketDataProvider, SymbolMapping[]> = {
-    'twelve-data': [],
-  }
+  return {
+    'twelve-data': assets
+      .map((asset) => resolveSymbol(asset.ticker, asset.assetClass))
+      .filter((mapping): mapping is SymbolMapping => mapping !== null),
 
-  for (const asset of assets) {
-    const mapping = resolveSymbol(asset.ticker, asset.assetClass)
-    if (!mapping) continue
-    grouped['twelve-data'].push(mapping)
+    coingecko: [],
+    alphavantage: [],
+    yahoo: [],
   }
-
-  return grouped
 }
 
 export function hasLivePriceSource(
