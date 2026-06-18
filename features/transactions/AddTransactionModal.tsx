@@ -2,15 +2,33 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Modal, Input, Select, Button, SegmentedControl, EmptyState } from '@/components/ui'
-import { useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
-import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { computeAssetPosition } from '@/lib/calculations'
 import { showSuccessToast } from '@/store/toast.store'
-import { formatCurrency, formatNumber, toDateInputValue, fromDateInputValue } from '@/lib/utils'
+import { formatCurrency, formatNumber, toDateInputValue } from '@/lib/utils'
 import { ASSET_CLASS_META } from '@/lib/constants'
 import type { SimTransactionType } from '@/types/simulation'
 import { PackagePlus } from 'lucide-react'
+
+function currentTimeInputValue() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function dateTimeToIso(date: string, time: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+
+  return new Date(
+    year,
+    (month ?? 1) - 1,
+    day ?? 1,
+    hour ?? 0,
+    minute ?? 0,
+    0
+  ).toISOString()
+}
 
 export function AddTransactionModal() {
   const activeModal = useModalStore((s) => s.activeModal)
@@ -18,38 +36,38 @@ export function AddTransactionModal() {
   const closeModal = useModalStore((s) => s.closeModal)
   const openModal = useModalStore((s) => s.openModal)
 
+  const currency = useUIStore((s) => s.currency)
+
   const { assets, transactions } = useActivePortfolioData()
-  const { livePrices } = useLiveMarketDataContext()
   const addTransaction = useSimulationStore((s) => s.addTransaction)
 
   const isOpen = activeModal === 'add-transaction'
 
   const [assetId, setAssetId] = useState('')
   const [type, setType] = useState<SimTransactionType>('buy')
+  const [amount, setAmount] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [price, setPrice] = useState('')
   const [fee, setFee] = useState('0')
   const [date, setDate] = useState(toDateInputValue())
+  const [time, setTime] = useState(currentTimeInputValue())
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize / reset form whenever the modal opens
   useEffect(() => {
     if (!isOpen) return
+
     const initialAssetId = context.assetId ?? assets[0]?.id ?? ''
+
     setAssetId(initialAssetId)
     setType(context.type ?? 'buy')
+    setAmount('')
     setQuantity('')
-    // Prefill price with the latest live quote, if one exists, to save a lookup
-    const initialAsset = assets.find((a) => a.id === initialAssetId)
-    const liveQuote = initialAsset ? livePrices.get(initialAsset.ticker) : undefined
-    setPrice(liveQuote !== undefined ? String(liveQuote) : '')
     setFee('0')
     setDate(toDateInputValue())
+    setTime(currentTimeInputValue())
     setNote('')
     setError(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, context.assetId, context.type])
+  }, [isOpen, context.assetId, context.type, assets])
 
   const selectedAsset = assets.find((a) => a.id === assetId)
 
@@ -58,11 +76,22 @@ export function AddTransactionModal() {
     return computeAssetPosition(selectedAsset, transactions)
   }, [selectedAsset, transactions])
 
+  const amountNum = parseFloat(amount) || 0
   const quantityNum = parseFloat(quantity) || 0
-  const priceNum = parseFloat(price) || 0
   const feeNum = parseFloat(fee) || 0
-  const grossAmount = quantityNum * priceNum
-  const netAmount = type === 'buy' ? grossAmount + feeNum : grossAmount - feeNum
+
+  const effectiveAmount =
+    type === 'buy'
+      ? Math.max(amountNum - feeNum, 0)
+      : amountNum
+
+  const calculatedPrice =
+    quantityNum > 0 ? effectiveAmount / quantityNum : 0
+
+  const netAmount =
+    type === 'buy'
+      ? effectiveAmount + feeNum
+      : effectiveAmount - feeNum
 
   function handleClose() {
     closeModal()
@@ -72,15 +101,27 @@ export function AddTransactionModal() {
     e.preventDefault()
 
     if (!assetId) {
-      setError('Bitte wähle ein Asset')
+      setError('Bitte wähle ein Asset.')
       return
     }
+
+    if (amountNum <= 0) {
+      setError(type === 'buy' ? 'Investierter Betrag muss größer als 0 sein.' : 'Verkaufswert muss größer als 0 sein.')
+      return
+    }
+
     if (quantityNum <= 0) {
-      setError('Menge muss größer als 0 sein')
+      setError(type === 'buy' ? 'Erhaltene Menge muss größer als 0 sein.' : 'Verkaufte Menge muss größer als 0 sein.')
       return
     }
-    if (priceNum <= 0) {
-      setError('Preis muss größer als 0 sein')
+
+    if (calculatedPrice <= 0) {
+      setError('Der berechnete Preis muss größer als 0 sein.')
+      return
+    }
+
+    if (type === 'sell' && position?.hasPosition && quantityNum > position.quantity) {
+      setError(`Du kannst maximal ${formatNumber(position.quantity, 8)} ${selectedAsset?.ticker} verkaufen.`)
       return
     }
 
@@ -88,9 +129,9 @@ export function AddTransactionModal() {
       assetId,
       type,
       quantity: quantityNum,
-      price: priceNum,
+      price: calculatedPrice,
       fee: feeNum,
-      executedAt: fromDateInputValue(date),
+      executedAt: dateTimeToIso(date, time),
       note: note.trim() || undefined,
     })
 
@@ -101,13 +142,12 @@ export function AddTransactionModal() {
 
     showSuccessToast(
       type === 'buy' ? 'Kauf erfasst' : 'Verkauf erfasst',
-      `${formatNumber(quantityNum, 4)} ${selectedAsset?.ticker ?? ''} · ${formatCurrency(netAmount)}`
+      `${formatNumber(quantityNum, 8)} ${selectedAsset?.ticker ?? ''} · ${formatCurrency(netAmount, currency)}`
     )
 
     handleClose()
   }
 
-  // ── Empty state: no assets exist yet ──
   if (isOpen && assets.length === 0) {
     return (
       <Modal open={isOpen} onClose={handleClose} title="Transaktion erfassen">
@@ -129,7 +169,7 @@ export function AddTransactionModal() {
       open={isOpen}
       onClose={handleClose}
       title="Transaktion erfassen"
-      description="Buy- und Sell-Transaktionen bestimmen Bestand und Durchschnittspreis automatisch."
+      description="Gib Betrag, erhaltene Menge, Datum und Uhrzeit ein — der Kurs wird automatisch berechnet."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
@@ -150,7 +190,6 @@ export function AddTransactionModal() {
           ]}
         />
 
-        {/* Current position context */}
         {selectedAsset && position && (
           <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5 border border-border">
             <div className="flex items-center gap-2">
@@ -165,10 +204,11 @@ export function AddTransactionModal() {
               </span>
               <span className="text-data-sm text-ink-muted">Aktueller Bestand</span>
             </div>
+
             <div className="text-right">
               {position.hasPosition ? (
                 <p className="font-mono text-data-sm text-ink">
-                  {formatNumber(position.quantity, 4)} @ Ø {formatCurrency(position.avgCostBasis)}
+                  {formatNumber(position.quantity, 8)} @ Ø {formatCurrency(position.avgCostBasis, currency)}
                 </p>
               ) : (
                 <p className="text-data-sm text-ink-faint">Keine Position</p>
@@ -177,32 +217,33 @@ export function AddTransactionModal() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
-            label="Menge"
+            label={type === 'buy' ? 'Investierter Betrag' : 'Verkaufswert'}
             type="number"
             inputMode="decimal"
             step="any"
             min="0"
             placeholder="0.00"
+            prefix={currency === 'EUR' ? '€' : '$'}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+
+          <Input
+            label={type === 'buy' ? 'Erhaltene Menge' : 'Verkaufte Menge'}
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min="0"
+            placeholder="0.00000000"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             hint={
               type === 'sell' && position?.hasPosition
-                ? `Verfügbar: ${formatNumber(position.quantity, 4)}`
+                ? `Verfügbar: ${formatNumber(position.quantity, 8)}`
                 : undefined
             }
-          />
-          <Input
-            label="Preis pro Einheit"
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min="0"
-            placeholder="0.00"
-            prefix="$"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
           />
         </div>
 
@@ -214,43 +255,75 @@ export function AddTransactionModal() {
             max={toDateInputValue()}
             onChange={(e) => setDate(e.target.value)}
           />
+
           <Input
-            label="Gebühr"
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min="0"
-            placeholder="0.00"
-            prefix="$"
-            value={fee}
-            onChange={(e) => setFee(e.target.value)}
+            label="Uhrzeit"
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
           />
         </div>
 
         <Input
+          label="Gebühr"
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
+          placeholder="0.00"
+          prefix={currency === 'EUR' ? '€' : '$'}
+          value={fee}
+          onChange={(e) => setFee(e.target.value)}
+        />
+
+        <Input
           label="Notiz (optional)"
-          placeholder="z. B. Monatliches Sparplan-Buy"
+          placeholder="z. B. Kraken Einzahlung"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={120}
         />
 
-        {/* Live total preview */}
-        <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-3 border border-border">
-          <div>
+        <div className="rounded-lg bg-surface px-3 py-3 border border-border space-y-2">
+          <div className="flex items-center justify-between">
             <p className="text-data-xs text-ink-muted uppercase tracking-wide">
-              {type === 'buy' ? 'Gesamtkosten' : 'Erlös (netto)'}
+              Berechneter Kurs
             </p>
-            {feeNum > 0 && (
-              <p className="text-data-xs text-ink-faint mt-0.5">
-                {formatCurrency(grossAmount)} {type === 'buy' ? '+' : '−'} {formatCurrency(feeNum)} Gebühr
-              </p>
-            )}
+            <p className="font-mono text-data-sm text-ink">
+              {calculatedPrice > 0 ? formatCurrency(calculatedPrice, currency) : '—'}
+            </p>
           </div>
-          <p className="font-mono text-data-xl font-semibold text-ink">
-            {formatCurrency(netAmount)}
-          </p>
+
+          <div className="flex items-center justify-between">
+            <p className="text-data-xs text-ink-muted uppercase tracking-wide">
+              Menge
+            </p>
+            <p className="font-mono text-data-sm text-ink">
+              {formatNumber(quantityNum, 8)} {selectedAsset?.ticker ?? ''}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-border pt-2">
+            <div>
+              <p className="text-data-xs text-ink-muted uppercase tracking-wide">
+                {type === 'buy' ? 'Gesamtkosten' : 'Erlös netto'}
+              </p>
+              {feeNum > 0 && (
+                <p className="text-data-xs text-ink-faint mt-0.5">
+                  Gebühr: {formatCurrency(feeNum, currency)}
+                </p>
+              )}
+            </div>
+
+            <p className="font-mono text-data-xl font-semibold text-ink">
+              {formatCurrency(netAmount, currency)}
+            </p>
+          </div>
         </div>
+
+        <p className="text-data-xs text-ink-faint">
+          Ohne externe Kurs-API berechnet die App den Kurs aus Betrag ÷ Menge. Das funktioniert für Krypto, Aktien, ETFs, Metalle und Cash.
+        </p>
 
         {error && (
           <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2.5 text-data-sm text-loss">
@@ -262,6 +335,7 @@ export function AddTransactionModal() {
           <Button type="button" variant="ghost" onClick={handleClose}>
             Abbrechen
           </Button>
+
           <Button type="submit" variant="primary">
             {type === 'buy' ? 'Kauf erfassen' : 'Verkauf erfassen'}
           </Button>
