@@ -5,31 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// ─── Currency Conversion ──────────────────────────────────────────────────────
-// Base currency in the app is USD.
-// These are fixed approximate rates.
-// Example: 72 USD * 0.86 = 61.92 EUR
-
-const USD_TO_CURRENCY_RATE: Record<string, number> = {
-  USD: 1,
-  EUR: 0.86,
-  GBP: 0.74,
-  CHF: 0.80,
-  JPY: 150,
-}
-
-export function convertCurrencyValue(value: number, currency = 'USD'): number {
-  const rate = USD_TO_CURRENCY_RATE[currency] ?? 1
-  return value * rate
-}
-
 export function formatCurrency(
   value: number,
   currency = 'USD',
   compact = false
 ): string {
-  const convertedValue = convertCurrencyValue(value, currency)
-
   const locale =
     currency === 'EUR'
       ? 'de-DE'
@@ -39,21 +19,13 @@ export function formatCurrency(
           ? 'de-CH'
           : 'en-US'
 
-  if (compact && Math.abs(convertedValue) >= 1_000_000) {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      notation: 'compact',
-      maximumFractionDigits: 2,
-    }).format(convertedValue)
-  }
-
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
+    notation: compact && Math.abs(value) >= 1_000_000 ? 'compact' : 'standard',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(convertedValue)
+  }).format(value)
 }
 
 export function formatPercent(value: number, decimals = 2): string {
