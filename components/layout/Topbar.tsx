@@ -141,20 +141,16 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
               </button>
 
               <button
-                onClick={() => {
-  setUserOpen(false)
-
-  localStorage.removeItem('folio-demo-user')
-  localStorage.removeItem('ui-preferences')
-  localStorage.removeItem('folio-onboarding')
-
-  window.location.href = '/'
-}}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
-              >
-                <LogOut size={14} />
-                Logout
-              </button>
+  onClick={() => {
+    setUserOpen(false)
+    localStorage.removeItem('folio-demo-user')
+    window.location.href = '/'
+  }}
+  className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
+>
+  <LogOut size={14} />
+  Logout
+</button>
             </div>
           )}
         </div>
