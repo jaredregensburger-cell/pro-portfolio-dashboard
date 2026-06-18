@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { GlassCard, EmptyState, SkeletonTable } from '@/components/ui'
-import { useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { showInfoToast } from '@/store/toast.store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
