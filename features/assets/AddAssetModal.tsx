@@ -3,62 +3,59 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Search, Zap, ChevronRight } from 'lucide-react'
 import { Modal, Input, Select, Button } from '@/components/ui'
-import { useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useSimulationStore, useUIStore } from '@/store'
 import { ASSET_CLASS_OPTIONS, CURRENCIES } from '@/lib/constants'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import { TOP_STOCKS } from './topStocks'
 import { TOP_CRYPTO } from './topCrypto'
 import type { AssetClass } from '@/types'
 import type { GlobalAsset } from './assetTypes'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type Tab = 'stocks' | 'crypto' | 'manual'
 
 const TABS: { id: Tab; label: string; emoji: string }[] = [
-  { id: 'stocks', label: 'Stocks',  emoji: '📊' },
-  { id: 'crypto', label: 'Crypto',  emoji: '🪙' },
-  { id: 'manual', label: 'Manual',  emoji: '✏️'  },
+  { id: 'stocks', label: 'Stocks', emoji: '📊' },
+  { id: 'crypto', label: 'Crypto', emoji: '🪙' },
+  { id: 'manual', label: 'Manual', emoji: '✏️' },
 ]
 
 const initialManualState = {
-  ticker:     '',
-  name:       '',
+  ticker: '',
+  name: '',
   assetClass: 'stock' as AssetClass,
-  currency:   'USD',
+  currency: 'USD',
 }
-
-// ─── Asset Quick-Pick Row ─────────────────────────────────────────────────────
 
 function AssetPickRow({
   asset,
-  onAdd,
+  onSelect,
 }: {
   asset: GlobalAsset
-  onAdd: (asset: GlobalAsset) => void
+  onSelect: (asset: GlobalAsset) => void
 }) {
   return (
     <button
       type="button"
-      onClick={() => onAdd(asset)}
+      onClick={() => onSelect(asset)}
       className={cn(
         'w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg',
         'bg-surface-raised hover:bg-surface-overlay border border-transparent',
         'hover:border-border transition-all duration-150 group text-left'
       )}
     >
-      {/* Symbol badge */}
       <div className="flex items-center gap-3 min-w-0">
         <span className="shrink-0 flex h-8 w-8 items-center justify-center rounded-md bg-surface-elevated border border-border text-data-xs font-bold text-signal font-mono">
           {asset.symbol.length > 4 ? asset.symbol.slice(0, 3) : asset.symbol}
         </span>
+
         <div className="min-w-0">
           <p className="text-data-sm font-medium text-ink truncate">{asset.name}</p>
-          <p className="text-data-xs text-ink-faint font-mono">{asset.symbol} · {asset.currency}</p>
+          <p className="text-data-xs text-ink-faint font-mono">
+            {asset.symbol} · {asset.currency}
+          </p>
         </div>
       </div>
 
-      {/* Quick-add indicator */}
       <ChevronRight
         size={14}
         strokeWidth={2}
@@ -67,8 +64,6 @@ function AssetPickRow({
     </button>
   )
 }
-
-// ─── Search Input ─────────────────────────────────────────────────────────────
 
 function SearchInput({
   value,
@@ -86,6 +81,7 @@ function SearchInput({
         strokeWidth={2}
         className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
       />
+
       <input
         type="text"
         value={value}
@@ -102,32 +98,36 @@ function SearchInput({
   )
 }
 
-// ─── Main Modal ───────────────────────────────────────────────────────────────
-
 export function AddAssetModal() {
   const activeModal = useModalStore((s) => s.activeModal)
-  const closeModal  = useModalStore((s) => s.closeModal)
-  const openModal   = useModalStore((s) => s.openModal)
-  const addAsset    = useSimulationStore((s) => s.addAsset)
+  const closeModal = useModalStore((s) => s.closeModal)
+  const addAsset = useSimulationStore((s) => s.addAsset)
+  const displayCurrency = useUIStore((s) => s.currency)
 
   const isOpen = activeModal === 'add-asset'
 
-  const [tab,        setTab]        = useState<Tab>('stocks')
-  const [search,     setSearch]     = useState('')
+  const [tab, setTab] = useState<Tab>('stocks')
+  const [search, setSearch] = useState('')
   const [manualForm, setManualForm] = useState(initialManualState)
-  const [error,      setError]      = useState<string | null>(null)
+  const [selectedCatalogAsset, setSelectedCatalogAsset] = useState<GlobalAsset | null>(null)
 
-  // Reset state whenever modal opens
+  const [initialQuantity, setInitialQuantity] = useState('')
+  const [initialValue, setInitialValue] = useState('')
+  const [initialFee, setInitialFee] = useState('0')
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
-    if (isOpen) {
-      setTab('stocks')
-      setSearch('')
-      setManualForm(initialManualState)
-      setError(null)
-    }
-  }, [isOpen])
+    if (!isOpen) return
 
-  // ── Filter logic ────────────────────────────────────────────────────────────
+    setTab('stocks')
+    setSearch('')
+    setManualForm(initialManualState)
+    setSelectedCatalogAsset(null)
+    setInitialQuantity('')
+    setInitialValue('')
+    setInitialFee('0')
+    setError(null)
+  }, [isOpen])
 
   const query = search.trim().toLowerCase()
 
@@ -145,15 +145,50 @@ export function AddAssetModal() {
       a.name.toLowerCase().includes(query)
   )
 
-  // ── Quick-add from catalog ───────────────────────────────────────────────────
+  const currentList = tab === 'stocks' ? filteredStocks : filteredCrypto
 
-  function handleQuickAdd(asset: GlobalAsset) {
+  const initialQuantityNum = parseFloat(initialQuantity) || 0
+  const initialValueNum = parseFloat(initialValue) || 0
+  const initialFeeNum = parseFloat(initialFee) || 0
+
+  const calculatedPrice =
+    initialQuantityNum > 0 && initialValueNum > 0
+      ? Math.max((initialValueNum - initialFeeNum) / initialQuantityNum, 0)
+      : 0
+
+  function getPrefix(currency: string) {
+    if (currency === 'EUR') return '€'
+    if (currency === 'GBP') return '£'
+    if (currency === 'CHF') return 'Fr'
+    if (currency === 'JPY') return '¥'
+    return '$'
+  }
+
+  function submitAsset(input: {
+    ticker: string
+    name: string
+    assetClass: AssetClass
+    currency?: string
+  }) {
     setError(null)
+
+    if ((initialQuantityNum > 0 && initialValueNum <= 0) || (initialValueNum > 0 && initialQuantityNum <= 0)) {
+      setError('Wenn du eine Startposition einträgst, müssen Menge und aktueller Wert beide ausgefüllt sein.')
+      return
+    }
+
     const result = addAsset({
-      ticker:     asset.symbol,
-      name:       asset.name,
-      assetClass: asset.type as AssetClass,
-      currency:   asset.currency,
+      ticker: input.ticker,
+      name: input.name,
+      assetClass: input.assetClass,
+      currency: input.currency ?? displayCurrency,
+      initialQuantity: initialQuantityNum,
+      initialValue: initialValueNum,
+      initialFee: initialFeeNum,
+      initialNote:
+        initialQuantityNum > 0 && initialValueNum > 0
+          ? 'Startbestand beim Asset-Anlegen'
+          : undefined,
     })
 
     if (!result.success) {
@@ -161,46 +196,60 @@ export function AddAssetModal() {
       return
     }
 
-    openModal('add-transaction', { assetId: result.asset.id, type: 'buy' })
+    closeModal()
   }
 
-  // ── Manual submit ────────────────────────────────────────────────────────────
+  function handleCatalogSubmit(e: FormEvent) {
+    e.preventDefault()
+
+    if (!selectedCatalogAsset) {
+      setError('Bitte wähle zuerst ein Asset aus.')
+      return
+    }
+
+    submitAsset({
+      ticker: selectedCatalogAsset.symbol,
+      name: selectedCatalogAsset.name,
+      assetClass: selectedCatalogAsset.type as AssetClass,
+      currency: selectedCatalogAsset.currency,
+    })
+  }
 
   function handleManualSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
 
-    const result = addAsset({
-      ticker:     manualForm.ticker,
-      name:       manualForm.name,
+    submitAsset({
+      ticker: manualForm.ticker,
+      name: manualForm.name,
       assetClass: manualForm.assetClass,
-      currency:   manualForm.currency,
+      currency: manualForm.currency,
     })
-
-    if (!result.success) {
-      setError(result.error)
-      return
-    }
-
-    openModal('add-transaction', { assetId: result.asset.id, type: 'buy' })
   }
 
-  const currentList = tab === 'stocks' ? filteredStocks : filteredCrypto
+  const activeCurrency =
+    selectedCatalogAsset?.currency ??
+    manualForm.currency ??
+    displayCurrency
 
   return (
     <Modal
       open={isOpen}
       onClose={closeModal}
       title="Asset hinzufügen"
+      description="Lege ein Asset an und trage optional direkt deinen aktuellen Bestand ein."
       maxWidth="md"
     >
-      {/* ── Tabs ── */}
       <div className="flex gap-1 p-1 rounded-lg bg-surface-raised border border-border mb-4">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            onClick={() => { setTab(t.id); setSearch(''); setError(null) }}
+            onClick={() => {
+              setTab(t.id)
+              setSearch('')
+              setSelectedCatalogAsset(null)
+              setError(null)
+            }}
             className={cn(
               'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md',
               'text-data-sm font-medium transition-all duration-150',
@@ -215,49 +264,94 @@ export function AddAssetModal() {
         ))}
       </div>
 
-      {/* ── Stocks / Crypto tabs ── */}
       {(tab === 'stocks' || tab === 'crypto') && (
-        <div className="space-y-3">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={tab === 'stocks' ? 'AAPL, Apple…' : 'BTC, Bitcoin…'}
-          />
+        <form onSubmit={handleCatalogSubmit} className="space-y-4">
+          {!selectedCatalogAsset ? (
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder={tab === 'stocks' ? 'AAPL, Apple…' : 'BTC, Bitcoin…'}
+              />
 
-          {/* List */}
-          <div className="space-y-1 max-h-80 overflow-y-auto pr-0.5">
-            {currentList.length === 0 ? (
-              <div className="py-8 text-center text-data-sm text-ink-faint">
-                Keine Ergebnisse für „{search}"
+              <div className="space-y-1 max-h-80 overflow-y-auto pr-0.5">
+                {currentList.length === 0 ? (
+                  <div className="py-8 text-center text-data-sm text-ink-faint">
+                    Keine Ergebnisse für „{search}"
+                  </div>
+                ) : (
+                  currentList.map((asset) => (
+                    <AssetPickRow
+                      key={asset.id}
+                      asset={asset}
+                      onSelect={(a) => setSelectedCatalogAsset(a)}
+                    />
+                  ))
+                )}
               </div>
-            ) : (
-              currentList.map((asset) => (
-                <AssetPickRow key={asset.id} asset={asset} onAdd={handleQuickAdd} />
-              ))
-            )}
-          </div>
 
-          {/* Quick-add hint */}
-          {!search && (
-            <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
-              <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
-              Klick = sofort hinzufügen &amp; direkt Transaktion erfassen
-            </p>
-          )}
+              {!search && (
+                <p className="flex items-center gap-1.5 text-data-xs text-ink-faint pt-1">
+                  <Zap size={11} strokeWidth={2.5} className="text-amber-400" />
+                  Wähle ein Asset aus und trage danach optional deinen Bestand ein.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="rounded-lg border border-border bg-surface-raised px-3 py-3">
+                <p className="text-data-sm font-semibold text-ink">
+                  {selectedCatalogAsset.name}
+                </p>
+                <p className="text-data-xs text-ink-faint font-mono">
+                  {selectedCatalogAsset.symbol} · {selectedCatalogAsset.currency}
+                </p>
 
-          {error && (
-            <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2.5 text-data-sm text-loss">
-              {error}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCatalogAsset(null)}
+                  className="mt-2 text-data-xs text-signal hover:text-signal-dim"
+                >
+                  Anderes Asset wählen
+                </button>
+              </div>
+
+              <InitialPositionFields
+                quantity={initialQuantity}
+                value={initialValue}
+                fee={initialFee}
+                onQuantityChange={setInitialQuantity}
+                onValueChange={setInitialValue}
+                onFeeChange={setInitialFee}
+                currency={activeCurrency}
+                prefix={getPrefix(activeCurrency)}
+                calculatedPrice={calculatedPrice}
+                ticker={selectedCatalogAsset.symbol}
+              />
+
+              {error && (
+                <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2.5 text-data-sm text-loss">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="ghost" onClick={closeModal}>
+                  Abbrechen
+                </Button>
+                <Button type="submit" variant="primary">
+                  Asset hinzufügen
+                </Button>
+              </div>
+            </>
           )}
-        </div>
+        </form>
       )}
 
-      {/* ── Manual tab ── */}
       {tab === 'manual' && (
         <form onSubmit={handleManualSubmit} className="space-y-4">
           <p className="text-data-sm text-ink-muted">
-            Gib das Asset manuell ein — z.&nbsp;B. für exotische Aktien, ETFs oder physische Metalle.
+            Gib das Asset manuell ein — z. B. für exotische Aktien, ETFs oder physische Metalle.
           </p>
 
           <Input
@@ -294,10 +388,28 @@ export function AddAssetModal() {
             <Select
               label="Währung"
               value={manualForm.currency}
-              onChange={(e) => setManualForm((f) => ({ ...f, currency: e.target.value }))}
-              options={CURRENCIES.map((c) => ({ label: `${c.symbol} ${c.value}`, value: c.value }))}
+              onChange={(e) =>
+                setManualForm((f) => ({ ...f, currency: e.target.value }))
+              }
+              options={CURRENCIES.map((c) => ({
+                label: `${c.symbol} ${c.value}`,
+                value: c.value,
+              }))}
             />
           </div>
+
+          <InitialPositionFields
+            quantity={initialQuantity}
+            value={initialValue}
+            fee={initialFee}
+            onQuantityChange={setInitialQuantity}
+            onValueChange={setInitialValue}
+            onFeeChange={setInitialFee}
+            currency={manualForm.currency}
+            prefix={getPrefix(manualForm.currency)}
+            calculatedPrice={calculatedPrice}
+            ticker={manualForm.ticker || 'Asset'}
+          />
 
           {error && (
             <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2.5 text-data-sm text-loss">
@@ -316,5 +428,97 @@ export function AddAssetModal() {
         </form>
       )}
     </Modal>
+  )
+}
+
+function InitialPositionFields({
+  quantity,
+  value,
+  fee,
+  onQuantityChange,
+  onValueChange,
+  onFeeChange,
+  currency,
+  prefix,
+  calculatedPrice,
+  ticker,
+}: {
+  quantity: string
+  value: string
+  fee: string
+  onQuantityChange: (value: string) => void
+  onValueChange: (value: string) => void
+  onFeeChange: (value: string) => void
+  currency: string
+  prefix: string
+  calculatedPrice: number
+  ticker: string
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
+      <div>
+        <p className="text-data-sm font-semibold text-ink">
+          Startposition optional
+        </p>
+        <p className="text-data-xs text-ink-faint mt-0.5">
+          Trage deinen aktuellen Bestand ein. Die App berechnet daraus den Kurs.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Input
+          label={`Aktuelle Menge (${ticker})`}
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
+          placeholder="0.00000000"
+          value={quantity}
+          onChange={(e) => onQuantityChange(e.target.value)}
+        />
+
+        <Input
+          label={`Aktueller Wert (${currency})`}
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
+          placeholder="0.00"
+          prefix={prefix}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        />
+      </div>
+
+      <Input
+        label="Gebühr optional"
+        type="number"
+        inputMode="decimal"
+        step="any"
+        min="0"
+        placeholder="0.00"
+        prefix={prefix}
+        value={fee}
+        onChange={(e) => onFeeChange(e.target.value)}
+      />
+
+      <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2">
+        <p className="text-data-xs text-ink-muted uppercase tracking-wide">
+          Berechneter Kurs
+        </p>
+        <p className="font-mono text-data-sm text-ink">
+          {calculatedPrice > 0
+            ? `${formatCurrency(calculatedPrice, currency)} / ${ticker}`
+            : '—'}
+        </p>
+      </div>
+
+      {quantity && value && (
+        <p className="text-data-xs text-ink-faint">
+          Beispiel: {formatNumber(parseFloat(quantity) || 0, 8)} {ticker} mit einem Wert von{' '}
+          {formatCurrency(parseFloat(value) || 0, currency)}.
+        </p>
+      )}
+    </div>
   )
 }
