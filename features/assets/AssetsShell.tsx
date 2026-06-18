@@ -69,7 +69,7 @@ export function AssetsShell() {
         </div>
         <div className="ml-auto font-mono text-data-sm text-ink-muted shrink-0">
           {ranked.length} {ranked.length === 1 ? 'asset' : 'assets'} ·{' '}
-          <span className="text-ink font-medium">{formatCurrency(totalValue)}</span>
+          <span className="text-ink font-medium">{formatCurrency(totalValue, currency)}</span>
         </div>
       </div>
 
