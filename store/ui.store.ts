@@ -8,15 +8,16 @@ interface UIState {
   theme: Theme
   sidebar: SidebarState
   currency: string
-  /** Mobile-only: whether the sidebar drawer is open. Never persisted. */
+  displayName: string
+  email: string
   mobileSidebarOpen: boolean
 
-  // Actions
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
   setSidebar: (state: SidebarState) => void
   toggleSidebar: () => void
   setCurrency: (currency: string) => void
+  setProfile: (input: { displayName?: string; email?: string }) => void
   openMobileSidebar: () => void
   closeMobileSidebar: () => void
   toggleMobileSidebar: () => void
@@ -28,6 +29,8 @@ export const useUIStore = create<UIState>()(
       theme: 'dark',
       sidebar: 'expanded',
       currency: 'USD',
+      displayName: 'Alex Investor',
+      email: 'alex@folio.app',
       mobileSidebarOpen: false,
 
       setTheme: (theme) => set({ theme }),
@@ -40,6 +43,12 @@ export const useUIStore = create<UIState>()(
 
       setCurrency: (currency) => set({ currency }),
 
+      setProfile: ({ displayName, email }) =>
+        set((state) => ({
+          displayName: displayName ?? state.displayName,
+          email: email ?? state.email,
+        })),
+
       openMobileSidebar: () => set({ mobileSidebarOpen: true }),
       closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
       toggleMobileSidebar: () => set({ mobileSidebarOpen: !get().mobileSidebarOpen }),
@@ -50,7 +59,8 @@ export const useUIStore = create<UIState>()(
         theme: state.theme,
         sidebar: state.sidebar,
         currency: state.currency,
-        // mobileSidebarOpen is intentionally excluded — always starts closed
+        displayName: state.displayName,
+        email: state.email,
       }),
     }
   )
