@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties ──────────────────────────────────────────────── */
+
+:root {
+  --color-void: #0a0b0f;
+  --color-surface: #111318;
+  --color-surface-raised: #161922;
+  --color-surface-elevated: #1c2333;
+  --color-surface-overlay: #232b3e;
+  --color-border: #1e2535;
+  --color-signal: #3b82f6;
+  --color-gain: #10b981;
+  --color-loss: #ef4444;
+  --color-violet: #8b5cf6;
+  --color-ink: #e2e8f0;
+  --color-ink-muted: #94a3b8;
+  --color-ink-faint: #475569;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
+
+html {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-ink);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3550;
+}
+
+/* ─── Hidden Scrollbar Utility ───────────────────────────────────────────── */
+/* For horizontally-scrollable strips (e.g. TimeRangeSelector on mobile)
+   where the scroll affordance itself would look noisy. */
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Selection ──────────────────────────────────────────────────────────── */
+
+::selection {
+  background-color: rgba(59, 130, 246, 0.25);
+  color: #e2e8f0;
+}
+
+/* ─── Focus ──────────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Typography Utilities ───────────────────────────────────────────────── */
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Shimmer animation ───────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
+/* ─── Grid Background ────────────────────────────────────────────────────── */
+
+.bg-grid {
+  background-image: linear-gradient(rgba(30, 37, 53, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 37, 53, 0.5) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ─── Glassmorphism ───────────────────────────────────────────────────────── */
+
+.glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ─── Number Display ─────────────────────────────────────────────────────── */
+
+.num {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
