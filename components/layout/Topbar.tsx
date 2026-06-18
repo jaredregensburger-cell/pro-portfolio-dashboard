@@ -143,8 +143,6 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
               <button
   onClick={() => {
     setUserOpen(false)
-    localStorage.removeItem('folio-demo-user')
-    window.location.href = '/'
   }}
   className="flex w-full items-center gap-2 px-3 py-2.5 text-data-sm text-ink-muted hover:text-loss hover:bg-loss/10 transition-colors"
 >
