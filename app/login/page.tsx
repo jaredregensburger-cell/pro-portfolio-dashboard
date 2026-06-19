@@ -5,13 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Zap } from 'lucide-react'
 import { useUIStore } from '@/store'
-
-type DemoAccount = {
-  name: string
-  email: string
-  password: string
-  registeredAt: string
-}
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,49 +13,43 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    setLoading(true)
 
-    const rawAccount = localStorage.getItem('folio-demo-account')
+    const supabase = createSupabaseBrowserClient()
 
-    if (!rawAccount) {
-      setError('Es wurde noch kein Account erstellt.')
-      return
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
 
-    const account = JSON.parse(rawAccount) as DemoAccount
+    setLoading(false)
 
-    if (
-      account.email.toLowerCase() !== email.trim().toLowerCase() ||
-      account.password !== password
-    ) {
+    if (error) {
       setError('E-Mail oder Passwort ist falsch.')
       return
     }
 
-    localStorage.setItem(
-      'folio-demo-session',
-      JSON.stringify({
-        email: account.email,
-        loggedInAt: new Date().toISOString(),
-      })
-    )
-
     setProfile({
-      displayName: account.name,
-      email: account.email,
+      displayName:
+        data.user?.user_metadata?.display_name ||
+        data.user?.user_metadata?.name ||
+        'Investor',
+      email: data.user?.email ?? '',
     })
 
-    router.push('/dashboard' as any)
+    router.replace('/dashboard')
+    router.refresh()
   }
 
   return (
     <main className="min-h-screen bg-void bg-grid overflow-hidden">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-4 py-10 lg:px-8">
-
         <div className="mx-auto w-full max-w-md">
           <form
             onSubmit={handleSubmit}
@@ -81,7 +69,7 @@ export default function LoginPage() {
             </div>
 
             <p className="mb-6 text-ink-muted">
-              Melde dich an und verwalte Aktien, ETFs, Krypto und Metalle in einem Dashboard.
+              Melde dich an und verwalte dein Portfolio.
             </p>
 
             <div className="space-y-4">
@@ -91,6 +79,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface-raised px-3 py-3 text-ink outline-none transition focus:border-signal"
+                required
               />
 
               <input
@@ -99,6 +88,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface-raised px-3 py-3 text-ink outline-none transition focus:border-signal"
+                required
               />
 
               {error && (
@@ -109,9 +99,10 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                className="w-full rounded-xl bg-signal py-3 text-white font-semibold shadow-glow transition hover:brightness-110"
+                disabled={loading}
+                className="w-full rounded-xl bg-signal py-3 text-white font-semibold shadow-glow transition hover:brightness-110 disabled:opacity-60"
               >
-                Anmelden
+                {loading ? 'Anmelden…' : 'Anmelden'}
               </button>
             </div>
 
@@ -122,7 +113,6 @@ export default function LoginPage() {
               </Link>
             </div>
           </form>
-
         </div>
       </div>
     </main>
