@@ -17,35 +17,50 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+  e.preventDefault()
+  setError(null)
+  setLoading(true)
 
+  try {
     const supabase = createSupabaseBrowserClient()
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const loginPromise = supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
 
-    setLoading(false)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Login Timeout. Supabase antwortet nicht.')), 10000)
+    })
+
+    const { data, error } = await Promise.race([loginPromise, timeoutPromise])
 
     if (error) {
-      setError('E-Mail oder Passwort ist falsch.')
+      setError(`Login fehlgeschlagen: ${error.message}`)
+      return
+    }
+
+    if (!data.user) {
+      setError('Login fehlgeschlagen: Kein User zurückgegeben.')
       return
     }
 
     setProfile({
       displayName:
-        data.user?.user_metadata?.display_name ||
-        data.user?.user_metadata?.name ||
+        data.user.user_metadata?.display_name ||
+        data.user.user_metadata?.name ||
         'Investor',
-      email: data.user?.email ?? '',
+      email: data.user.email ?? '',
     })
 
     router.replace('/dashboard')
     router.refresh()
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Unbekannter Login-Fehler')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <main className="min-h-screen bg-void bg-grid overflow-hidden">
