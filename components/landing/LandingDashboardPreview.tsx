@@ -59,7 +59,7 @@ export function LandingDashboardPreview() {
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {(shown.length > 0 ? shown : [
             { symbol: 'BTC', price: 0, changePct: 0, currency: 'EUR' },
             { symbol: 'AAPL', price: 0, changePct: 0, currency: 'USD' },
