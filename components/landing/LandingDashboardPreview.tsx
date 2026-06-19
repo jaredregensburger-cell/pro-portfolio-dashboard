@@ -68,7 +68,7 @@ export function LandingDashboardPreview() {
           ]).map((item) => (
             <div
               key={item.symbol}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-3"
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-signal/10 font-mono text-data-xs font-bold text-signal">
                 {item.symbol}
