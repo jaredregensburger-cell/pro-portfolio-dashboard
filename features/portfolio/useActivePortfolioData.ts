@@ -1,42 +1,183 @@
 'use client'
 
-/**
- * /features/portfolio/useActivePortfolioData.ts
- *
- * Every dashboard/assets/transactions view needs the SAME thing: the
- * assets and transactions belonging to whichever portfolio is currently
- * active. Rather than repeating that filter in every component, this hook
- * is the single place that does it — keeping selection logic out of the UI
- * layer and out of the store's raw state shape.
- */
-
-import { useMemo } from 'react'
-import { useSimulationStore } from '@/store'
+import { useEffect, useState } from 'react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SimAsset, SimTransaction } from '@/types/simulation'
+import type { AssetClass } from '@/types'
 
 export interface ActivePortfolioData {
-  portfolioId:  string | null
-  assets:       SimAsset[]
+  portfolioId: string | null
+  assets: SimAsset[]
   transactions: SimTransaction[]
-  /** False during the brief window before persisted state has loaded from localStorage */
-  hasHydrated:  boolean
+  hasHydrated: boolean
+}
+
+type DbPortfolio = {
+  id: string
+  user_id: string
+  name: string
+  currency: string
+  is_default: boolean
+}
+
+type DbAsset = {
+  id: string
+  portfolio_id: string
+  ticker: string
+  name: string
+  asset_class: string
+  currency: string
+  added_at?: string | null
+  created_at?: string | null
+}
+
+type DbTransaction = {
+  id: string
+  portfolio_id: string
+  asset_id: string | null
+  type: string
+  quantity: number | null
+  price: number | null
+  fee: number | null
+  executed_at: string
+  note: string | null
+  created_at: string
+}
+
+function mapAssetClass(value: string): AssetClass {
+  if (value === 'equity') return 'stock'
+  if (value === 'commodity') return 'metal'
+  if (value === 'crypto') return 'crypto'
+  if (value === 'etf') return 'etf'
+  if (value === 'cash') return 'cash'
+  return 'stock'
 }
 
 export function useActivePortfolioData(): ActivePortfolioData {
-  const activePortfolioId = useSimulationStore((s) => s.activePortfolioId)
-  const allAssets = useSimulationStore((s) => s.assets)
-  const allTransactions = useSimulationStore((s) => s.transactions)
-  const hasHydrated = useSimulationStore((s) => s.hasHydrated)
+  const [portfolioId, setPortfolioId] = useState<string | null>(null)
+  const [assets, setAssets] = useState<SimAsset[]>([])
+  const [transactions, setTransactions] = useState<SimTransaction[]>([])
+  const [hasHydrated, setHasHydrated] = useState(false)
 
-  const assets = useMemo(
-    () => allAssets.filter((a) => a.portfolioId === activePortfolioId),
-    [allAssets, activePortfolioId]
-  )
+  useEffect(() => {
+    let cancelled = false
 
-  const transactions = useMemo(() => {
-    const assetIds = new Set(assets.map((a) => a.id))
-    return allTransactions.filter((t) => assetIds.has(t.assetId))
-  }, [allTransactions, assets])
+    async function load() {
+      setHasHydrated(false)
 
-  return { portfolioId: activePortfolioId, assets, transactions, hasHydrated }
+      const supabase = createSupabaseBrowserClient()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (!cancelled) {
+          setPortfolioId(null)
+          setAssets([])
+          setTransactions([])
+          setHasHydrated(true)
+        }
+        return
+      }
+
+      let { data: portfolio, error: portfolioError } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle<DbPortfolio>()
+
+      if (portfolioError) {
+        console.error('Portfolio load error:', portfolioError)
+      }
+
+      if (!portfolio) {
+        const { data: createdPortfolio, error: createError } = await supabase
+          .from('portfolios')
+          .insert({
+            user_id: user.id,
+            name: 'Mein Portfolio',
+            description: 'Default portfolio',
+            currency: 'EUR',
+            is_default: true,
+          })
+          .select('*')
+          .single<DbPortfolio>()
+
+        if (createError) {
+          console.error('Portfolio create error:', createError)
+
+          if (!cancelled) {
+            setPortfolioId(null)
+            setAssets([])
+            setTransactions([])
+            setHasHydrated(true)
+          }
+
+          return
+        }
+
+        portfolio = createdPortfolio
+      }
+
+      const [{ data: dbAssets, error: assetsError }, { data: dbTransactions, error: transactionsError }] =
+        await Promise.all([
+          supabase
+            .from('assets')
+            .select('*')
+            .eq('portfolio_id', portfolio.id)
+            .order('added_at', { ascending: true }),
+
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('portfolio_id', portfolio.id)
+            .order('executed_at', { ascending: false }),
+        ])
+
+      if (assetsError) console.error('Assets load error:', assetsError)
+      if (transactionsError) console.error('Transactions load error:', transactionsError)
+
+      const mappedAssets: SimAsset[] = ((dbAssets ?? []) as DbAsset[]).map((asset) => ({
+        id: asset.id,
+        portfolioId: asset.portfolio_id,
+        ticker: asset.ticker,
+        name: asset.name,
+        assetClass: mapAssetClass(asset.asset_class),
+        currency: asset.currency,
+        addedAt: asset.added_at ?? asset.created_at ?? new Date().toISOString(),
+      }))
+
+      const mappedTransactions: SimTransaction[] = ((dbTransactions ?? []) as DbTransaction[])
+        .filter((tx) => tx.type === 'buy' || tx.type === 'sell')
+        .filter((tx) => tx.asset_id && tx.quantity && tx.price)
+        .map((tx) => ({
+          id: tx.id,
+          assetId: tx.asset_id as string,
+          type: tx.type as 'buy' | 'sell',
+          quantity: Number(tx.quantity),
+          price: Number(tx.price),
+          fee: Number(tx.fee ?? 0),
+          executedAt: tx.executed_at,
+          note: tx.note ?? undefined,
+          createdAt: tx.created_at,
+        }))
+
+      if (!cancelled) {
+        setPortfolioId(portfolio.id)
+        setAssets(mappedAssets)
+        setTransactions(mappedTransactions)
+        setHasHydrated(true)
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return { portfolioId, assets, transactions, hasHydrated }
 }
