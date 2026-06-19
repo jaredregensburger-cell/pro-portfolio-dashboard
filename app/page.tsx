@@ -75,7 +75,7 @@ export default function HomePage() {
           <LandingDashboardPreview />
         </div>
 
-        <div className="mt-10 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="mt-6 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-4">
           {['Aktien', 'ETFs', 'Krypto', 'Metalle'].map((item) => (
             <div key={item} className="rounded-2xl border border-border bg-surface/60 p-4 text-center">
               <p className="font-semibold text-ink">{item}</p>
