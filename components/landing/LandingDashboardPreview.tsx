@@ -47,7 +47,7 @@ export function LandingDashboardPreview() {
           </div>
         </div>
 
-        <div className="mb-3 h-28 rounded-xl border border-border bg-surface-raised p-3">
+        <div className="mb-2 h-20 rounded-xl border border-border bg-surface-raised p-3">
           <div className="flex h-full items-end gap-2">
             {[35, 48, 42, 63, 58, 76, 70, 88, 82, 96, 91, 100].map((h, i) => (
               <div
