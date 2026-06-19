@@ -97,13 +97,6 @@ export function LandingDashboardPreview() {
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-border bg-surface-raised p-3">
-          <BarChart3 size={15} className="mb-2 text-signal" />
-          <p className="font-mono text-data-sm text-ink">Live</p>
-          <p className="text-data-xs text-ink-faint">Prices</p>
-        </div>
-
         <div className="rounded-xl border border-border bg-surface-raised p-3">
           <TrendingUp size={15} className="mb-2 text-gain" />
           <p className="font-mono text-data-sm text-ink">45s</p>
