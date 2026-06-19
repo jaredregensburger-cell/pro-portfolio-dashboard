@@ -97,7 +97,7 @@ export function LandingDashboardPreview() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-3 grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-border bg-surface-raised p-3">
           <BarChart3 size={15} className="mb-2 text-signal" />
           <p className="font-mono text-data-sm text-ink">Live</p>
