@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Zap } from 'lucide-react'
 import { useUIStore } from '@/store'
 import { LiveTicker } from '@/components/landing/LiveTicker'
-import { LandingDashboardPreview } from '@/components/landing/LandingDashboardPreview'
 
 type DemoAccount = {
   name: string
@@ -67,7 +66,7 @@ export default function LoginPage() {
           <LiveTicker />
         </div>
 
-        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="mx-auto w-full max-w-md">
           <form
             onSubmit={handleSubmit}
             className="w-full rounded-3xl border border-border bg-surface/85 p-6 shadow-glass-lg backdrop-blur-glass"
