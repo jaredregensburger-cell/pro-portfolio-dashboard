@@ -54,10 +54,10 @@ export function LiveTicker() {
       {loading ? (
         <div className="h-10 animate-pulse bg-surface-raised" />
       ) : displayItems.length === 0 ? (
-        <div className="px-4 py-2 text-center text-data-sm text-ink-faint">
-          Live-Ticker lädt…
-        </div>
-      ) : (
+  <div className="px-4 py-2 text-center text-data-sm text-ink-faint">
+    Keine Live-Daten verfügbar. Prüfe TWELVE_DATA_API_KEY in Vercel.
+  </div>
+) : (
         <div
           className="flex w-max gap-10 px-4 py-2 text-data-sm"
           style={{ animation: 'folio-marquee 42s linear infinite' }}
