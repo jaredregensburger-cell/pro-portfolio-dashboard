@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, BarChart3, TrendingUp, Wallet } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { useUIStore } from '@/store'
 import { LiveTicker } from '@/components/landing/LiveTicker'
+import { LandingDashboardPreview } from '@/components/landing/LandingDashboardPreview'
 
 type DemoAccount = {
   name: string
@@ -127,83 +128,8 @@ export default function LoginPage() {
             </div>
           </form>
 
-          <div className="hidden lg:block rounded-3xl border border-border bg-surface/80 p-4 shadow-glass-lg backdrop-blur-glass">
-            <div className="rounded-2xl border border-border bg-void p-5">
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <p className="text-data-xs uppercase tracking-wide text-ink-faint">
-                    Portfolio Value
-                  </p>
-                  <p className="mt-1 font-mono text-3xl font-semibold text-ink">
-                    42.680,24 €
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-gain/10 px-3 py-1.5 font-mono text-data-sm text-gain">
-                  +8.42%
-                </div>
-              </div>
-
-              <div className="mb-5 h-44 rounded-xl border border-border bg-surface-raised p-4">
-                <div className="flex h-full items-end gap-2">
-                  {[35, 48, 42, 63, 58, 76, 70, 88, 82, 96, 91, 100].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t bg-signal/70"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {[
-                  ['BTC', 'Bitcoin', '12.430,20 €', '+3.8%'],
-                  ['AAPL', 'Apple Inc.', '8.120,40 €', '+1.1%'],
-                  ['GOOGL', 'Alphabet Inc.', '6.740,10 €', '+0.8%'],
-                  ['NVDA', 'Nvidia Corp.', '5.620,90 €', '+2.4%'],
-                ].map((row) => (
-                  <div
-                    key={row[0]}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-3"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-signal/10 font-mono text-data-xs font-bold text-signal">
-                      {row[0]}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-data-sm font-semibold text-ink">{row[0]}</p>
-                      <p className="truncate text-data-xs text-ink-faint">{row[1]}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="font-mono text-data-sm text-ink">{row[2]}</p>
-                      <p className="font-mono text-data-xs text-gain">{row[3]}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border bg-surface-raised p-3">
-                <BarChart3 size={15} className="mb-2 text-signal" />
-                <p className="font-mono text-data-sm text-ink">10k+</p>
-                <p className="text-data-xs text-ink-faint">Assets</p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-surface-raised p-3">
-                <TrendingUp size={15} className="mb-2 text-gain" />
-                <p className="font-mono text-data-sm text-ink">45s</p>
-                <p className="text-data-xs text-ink-faint">Refresh</p>
-              </div>
-
-              <div className="rounded-xl border border-border bg-surface-raised p-3">
-                <Wallet size={15} className="mb-2 text-violet" />
-                <p className="font-mono text-data-sm text-ink">∞</p>
-                <p className="text-data-xs text-ink-faint">Portfolios</p>
-              </div>
-            </div>
+          <div className="hidden lg:block">
+            <LandingDashboardPreview />
           </div>
         </div>
       </div>
