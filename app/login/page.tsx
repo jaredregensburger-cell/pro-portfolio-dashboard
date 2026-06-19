@@ -127,9 +127,6 @@ export default function LoginPage() {
             </div>
           </form>
 
-          <div className="hidden lg:block">
-            <LandingDashboardPreview />
-          </div>
         </div>
       </div>
     </main>
