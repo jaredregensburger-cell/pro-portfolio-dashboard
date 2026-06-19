@@ -4,7 +4,7 @@ import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, Skele
 import { PortfolioValueChart } from '@/components/charts'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
-import { usePortfolioStore, useModalStore, useSimulationStore, useUIStore } from '@/store'
+import { usePortfolioStore, useModalStore, useUIStore } from '@/store'
 import {
   getPortfolioAnalytics,
   getPortfolioValueHistory,
@@ -30,7 +30,6 @@ export function DashboardShell() {
   const { selectedTimeRange, setTimeRange } = usePortfolioStore()
   const currency = useUIStore((s) => s.currency)
   const openModal = useModalStore((s) => s.openModal)
-  const loadDemoData = useSimulationStore((s) => s.loadDemoData)
 
   if (!hasHydrated) {
     return (
@@ -51,9 +50,8 @@ export function DashboardShell() {
       <EmptyState
         icon={Wallet}
         title="Dein Portfolio ist leer"
-        description="Lege dein erstes Asset an und erfasse Käufe oder Verkäufe — Bestand, Durchschnittspreis und P&L werden vollständig aus deinen Transaktionen berechnet."
+        description="Lege dein erstes Asset an. Bestand, Durchschnittspreis und P&L werden aus deinen Transaktionen berechnet."
         action={{ label: 'Asset hinzufügen', onClick: () => openModal('add-asset') }}
-        secondaryAction={{ label: 'Demo-Daten laden', onClick: loadDemoData }}
         className="min-h-[420px]"
       />
     )
@@ -116,19 +114,8 @@ export function DashboardShell() {
           </div>
         </GlassCard>
 
-        <PerformerCard
-          label="Best Asset"
-          icon={Trophy}
-          ranked={analytics.bestAsset}
-          accent="gain"
-        />
-
-        <PerformerCard
-          label="Worst Asset"
-          icon={TrendingDown}
-          ranked={analytics.worstAsset}
-          accent="loss"
-        />
+        <PerformerCard label="Best Asset" icon={Trophy} ranked={analytics.bestAsset} accent="gain" />
+        <PerformerCard label="Worst Asset" icon={TrendingDown} ranked={analytics.worstAsset} accent="loss" />
       </div>
 
       <GlassCard padding="none" className="overflow-hidden">
@@ -139,6 +126,7 @@ export function DashboardShell() {
               <p className="font-mono text-data-2xl font-semibold text-ink">
                 {formatCurrency(analytics.totalValue, currency)}
               </p>
+
               {filteredHistory.length >= 2 && (
                 <span className={cn('font-mono text-data-sm font-medium', gainColor(rangeChange))}>
                   {rangeChange >= 0 ? '+' : ''}
@@ -147,7 +135,12 @@ export function DashboardShell() {
               )}
             </div>
           </div>
-          <TimeRangeSelector selected={selectedTimeRange} onChange={setTimeRange} className="self-start sm:self-auto" />
+
+          <TimeRangeSelector
+            selected={selectedTimeRange}
+            onChange={setTimeRange}
+            className="self-start sm:self-auto"
+          />
         </div>
 
         <div className="px-2 pb-2 pt-2">
@@ -164,6 +157,7 @@ export function DashboardShell() {
                 View all →
               </a>
             </div>
+
             <div className="divide-y divide-border">
               {analytics.positions.slice(0, 5).map(({ asset, position }) => (
                 <AssetRow key={asset.id} asset={asset} position={position} compact />
@@ -203,6 +197,7 @@ export function DashboardShell() {
                       >
                         {isBuy ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
                       </div>
+
                       <div className="flex-1 min-w-0">
                         <p className="text-data-sm font-medium text-ink truncate">
                           {isBuy ? 'Buy' : 'Sell'} {asset?.ticker ?? '—'}
@@ -211,6 +206,7 @@ export function DashboardShell() {
                           {formatRelativeTime(tx.executedAt)}
                         </p>
                       </div>
+
                       <p
                         className={cn(
                           'font-mono text-data-sm font-medium',
@@ -265,10 +261,15 @@ function PerformerCard({ label, icon: Icon, ranked, accent }: PerformerCardProps
       <div className="flex items-center gap-3">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-data-xs font-mono font-semibold"
-          style={{ backgroundColor: meta.bgColor, color: meta.color, border: `1px solid ${meta.borderColor}` }}
+          style={{
+            backgroundColor: meta.bgColor,
+            color: meta.color,
+            border: `1px solid ${meta.borderColor}`,
+          }}
         >
           {asset.ticker.slice(0, 4)}
         </div>
+
         <div className="min-w-0">
           <p className="text-data-base font-semibold text-ink truncate">{asset.ticker}</p>
           <p className="text-data-xs text-ink-muted truncate">{asset.name}</p>
