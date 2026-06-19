@@ -132,6 +132,6 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
           )}
         </div>
       )}
-    </div>
+    </div> 
   )
 }
