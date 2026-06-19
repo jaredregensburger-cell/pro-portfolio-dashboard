@@ -1,53 +1,149 @@
 'use client'
 
+import { useCallback, useEffect, useState } from 'react'
 import { GlassCard, EmptyState, Button } from '@/components/ui'
-import { useWatchlistStore, useModalStore, useSimulationStore } from '@/store'
+import { useModalStore, useUIStore } from '@/store'
 import { showInfoToast } from '@/store/toast.store'
 import { useLiveMarketData } from '@/features/portfolio/useLiveMarketData'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { WatchlistRow } from './WatchlistRow'
 import { Star, Plus } from 'lucide-react'
+import type { AssetClass } from '@/types'
+
+type WatchlistItem = {
+  id: string
+  user_id: string
+  ticker: string
+  name: string
+  asset_class: string
+  currency: string
+  created_at: string
+}
+
+function mapAssetClass(value: string): AssetClass {
+  if (value === 'equity') return 'stock'
+  if (value === 'commodity') return 'metal'
+  if (value === 'crypto') return 'crypto'
+  if (value === 'etf') return 'etf'
+  if (value === 'cash') return 'cash'
+  return value as AssetClass
+}
 
 export function WatchlistShell() {
-  const items = useWatchlistStore((s) => s.items)
-  const removeItem = useWatchlistStore((s) => s.removeItem)
-  const openModal = useModalStore((s) => s.openModal)
-  const addAsset = useSimulationStore((s) => s.addAsset)
+  const [items, setItems] = useState<WatchlistItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Watchlist items have no transaction history, so they need their own
-  // live price feed — separate from the portfolio's LiveMarketDataProvider,
-  // which only polls assets that are actually held.
+  const openModal = useModalStore((s) => s.openModal)
+  const currency = useUIStore((s) => s.currency)
+
+  const mappedItems = items.map((item) => ({
+    id: item.id,
+    ticker: item.ticker,
+    name: item.name,
+    assetClass: mapAssetClass(item.asset_class),
+  }))
+
   const { livePrices, staleTickers } = useLiveMarketData(
-    items.map((i) => ({ ticker: i.ticker, assetClass: i.assetClass }))
+    mappedItems.map((i) => ({
+      ticker: i.ticker,
+      assetClass: i.assetClass,
+    })),
+    currency
   )
+
+  const loadWatchlist = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      const supabase = createSupabaseBrowserClient()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setItems([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('watchlist_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      setItems((data ?? []) as WatchlistItem[])
+    } catch (err) {
+      console.error('Watchlist load error:', err)
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadWatchlist()
+
+    const handleRefresh = () => {
+      loadWatchlist()
+    }
+
+    window.addEventListener('folio:watchlist-changed', handleRefresh)
+
+    return () => {
+      window.removeEventListener('folio:watchlist-changed', handleRefresh)
+    }
+  }, [loadWatchlist])
+
+  async function removeItem(id: string, ticker: string) {
+    try {
+      const supabase = createSupabaseBrowserClient()
+
+      const { error } = await supabase
+        .from('watchlist_items')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      showInfoToast(`${ticker} entfernt`, 'Von der Watchlist genommen.')
+      window.dispatchEvent(new Event('folio:watchlist-changed'))
+      await loadWatchlist()
+    } catch (err) {
+      console.error('Watchlist delete error:', err)
+      showInfoToast(
+        'Entfernen fehlgeschlagen',
+        err instanceof Error ? err.message : 'Watchlist-Eintrag konnte nicht gelöscht werden.'
+      )
+    }
+  }
+
+  function handleBuy(item: WatchlistItem) {
+    openModal('add-asset', {
+      ticker: item.ticker,
+      name: item.name,
+    })
+  }
+
+  if (loading) {
+    return (
+      <GlassCard>
+        <p className="text-data-sm text-ink-muted">Watchlist lädt…</p>
+      </GlassCard>
+    )
+  }
 
   if (items.length === 0) {
     return (
       <EmptyState
         icon={Star}
         title="Watchlist ist leer"
-        description="Beobachte Assets, bevor du investierst. Sobald du eine Transaktion erfasst, wird automatisch eine echte Position daraus."
+        description="Beobachte Assets, bevor du investierst."
         action={{ label: 'Asset beobachten', onClick: () => openModal('add-watchlist-item') }}
       />
     )
-  }
-
-  function handleBuy(item: (typeof items)[number]) {
-    // Promote the watchlist item into a real tracked asset, then open the
-    // Add Transaction modal pre-filled with it — exactly the same flow as
-    // creating a brand-new asset from the Assets page.
-    const result = addAsset({
-      ticker: item.ticker,
-      name: item.name,
-      assetClass: item.assetClass,
-    })
-
-    if (result.success) {
-      removeItem(item.id)
-      openModal('add-transaction', { assetId: result.asset.id, type: 'buy' })
-    } else {
-      // Asset already exists in the active portfolio — just jump to recording a buy
-      openModal('add-transaction', { type: 'buy' })
-    }
   }
 
   return (
@@ -56,6 +152,7 @@ export function WatchlistShell() {
         <p className="font-mono text-data-sm text-ink-muted">
           {items.length} {items.length === 1 ? 'Asset' : 'Assets'} beobachtet
         </p>
+
         <Button variant="secondary" size="sm" onClick={() => openModal('add-watchlist-item')}>
           <Plus size={14} strokeWidth={2.5} />
           Hinzufügen
@@ -64,19 +161,25 @@ export function WatchlistShell() {
 
       <GlassCard padding="none">
         <div className="divide-y divide-border">
-          {items.map((item) => (
-            <WatchlistRow
-              key={item.id}
-              item={item}
-              livePrice={livePrices.get(item.ticker)}
-              isStale={staleTickers.has(item.ticker)}
-              onBuy={() => handleBuy(item)}
-              onRemove={() => {
-                removeItem(item.id)
-                showInfoToast(`${item.ticker} entfernt`, 'Von der Watchlist genommen.')
-              }}
-            />
-          ))}
+          {items.map((item) => {
+            const assetClass = mapAssetClass(item.asset_class)
+
+            return (
+              <WatchlistRow
+                key={item.id}
+                item={{
+                  id: item.id,
+                  ticker: item.ticker,
+                  name: item.name,
+                  assetClass,
+                }}
+                livePrice={livePrices.get(item.ticker)}
+                isStale={staleTickers.has(item.ticker)}
+                onBuy={() => handleBuy(item)}
+                onRemove={() => removeItem(item.id, item.ticker)}
+              />
+            )
+          })}
         </div>
       </GlassCard>
     </div>
