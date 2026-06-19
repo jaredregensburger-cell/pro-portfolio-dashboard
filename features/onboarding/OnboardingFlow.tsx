@@ -104,9 +104,9 @@ export function OnboardingFlow() {
   })
 
   if (error) {
-  alert(`Registrierung fehlgeschlagen: ${error.message}`)
-  return
-}
+    alert(error.message)
+    return
+  }
 
   setProfile({
     displayName: displayName.trim(),
@@ -120,11 +120,10 @@ export function OnboardingFlow() {
   })
 
   if (data.session) {
-  router.replace('/dashboard' as any)
-  router.refresh()
-} else {
-  alert('Account erstellt. Bitte melde dich jetzt an.')
-  router.replace('/login' as any)
+    router.replace('/dashboard' as any)
+  } else {
+    router.replace('/login' as any)
+  }
 }
 
   async function handleNext() {
