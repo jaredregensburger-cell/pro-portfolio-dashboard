@@ -10,6 +10,7 @@ import { LiveDataIndicator } from '@/features/portfolio/LiveDataIndicator'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { useUIStore } from '@/store'
 import { showInfoToast } from '@/store/toast.store'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 interface TopbarProps {
   title: string
