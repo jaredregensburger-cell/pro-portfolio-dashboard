@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BarChart3, PieChart, TrendingUp, Wallet } from 'lucide-react'
 import { formatCurrency, formatPercent, cn } from '@/lib/utils'
 
 type TickerItem = {
@@ -16,28 +15,39 @@ export function LandingDashboardPreview() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/landing-ticker', { cache: 'no-store' })
-      const data = await res.json()
-      setItems(Array.isArray(data.items) ? data.items : [])
+      try {
+        const res = await fetch('/api/landing-ticker', { cache: 'no-store' })
+        const data = await res.json()
+        setItems(Array.isArray(data.items) ? data.items : [])
+      } catch {
+        setItems([])
+      }
     }
 
     load()
-    const interval = window.setInterval(load, 45_000)
+    const interval = window.setInterval(load, 60_000)
     return () => window.clearInterval(interval)
   }, [])
 
   const shown = items.slice(0, 3)
+  const fallbackItems: TickerItem[] = [
+    { symbol: 'BTC', price: 0, changePct: 0, currency: 'EUR' },
+    { symbol: 'AAPL', price: 0, changePct: 0, currency: 'USD' },
+    { symbol: 'GOOGL', price: 0, changePct: 0, currency: 'USD' },
+  ]
+
+  const visibleItems = shown.length > 0 ? shown : fallbackItems
   const mockValue = shown.reduce((sum, item) => sum + item.price, 0)
 
   return (
     <div className="rounded-3xl border border-border bg-surface/80 p-4 shadow-glass-lg backdrop-blur-glass">
       <div className="rounded-2xl border border-border bg-void p-5">
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-data-xs uppercase tracking-wide text-ink-faint">
               Live Market Preview
             </p>
-            <p className="mt-1 font-mono text-3xl font-semibold text-ink">
+            <p className="mt-1 font-mono text-2xl font-semibold text-ink">
               {mockValue > 0 ? formatCurrency(mockValue, 'EUR') : 'Live Daten'}
             </p>
           </div>
@@ -47,7 +57,7 @@ export function LandingDashboardPreview() {
           </div>
         </div>
 
-        <div className="mb-2 h-20 rounded-xl border border-border bg-surface-raised p-3">
+        <div className="mb-3 h-20 rounded-xl border border-border bg-surface-raised p-3">
           <div className="flex h-full items-end gap-2">
             {[35, 48, 42, 63, 58, 76, 70, 88, 82, 96, 91, 100].map((h, i) => (
               <div
@@ -60,12 +70,7 @@ export function LandingDashboardPreview() {
         </div>
 
         <div className="space-y-1.5">
-          {(shown.length > 0 ? shown : [
-            { symbol: 'BTC', price: 0, changePct: 0, currency: 'EUR' },
-            { symbol: 'AAPL', price: 0, changePct: 0, currency: 'USD' },
-            { symbol: 'GOOGL', price: 0, changePct: 0, currency: 'USD' },
-            { symbol: 'NVDA', price: 0, changePct: 0, currency: 'USD' },
-          ]).map((item) => (
+          {visibleItems.map((item) => (
             <div
               key={item.symbol}
               className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2"
@@ -94,19 +99,6 @@ export function LandingDashboardPreview() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-        <div className="rounded-xl border border-border bg-surface-raised p-3">
-          <TrendingUp size={15} className="mb-2 text-gain" />
-          <p className="font-mono text-data-sm text-ink">45s</p>
-          <p className="text-data-xs text-ink-faint">Refresh</p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface-raised p-3">
-          <PieChart size={15} className="mb-2 text-violet" />
-          <p className="font-mono text-data-sm text-ink">Multi</p>
-          <p className="text-data-xs text-ink-faint">Assets</p>
         </div>
       </div>
     </div>
