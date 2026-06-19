@@ -6,6 +6,7 @@ import { ASSET_CLASS_META } from '@/lib/constants'
 import { useUIStore } from '@/store'
 import type { SimAsset, AssetPosition } from '@/types/simulation'
 import { Plus, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface AssetRowProps {
   asset: SimAsset
@@ -16,15 +17,21 @@ interface AssetRowProps {
 }
 
 export function AssetRow({ asset, position, compact = false, onTrade, onRemove }: AssetRowProps) {
+  const router = useRouter()
   const currency = useUIStore((s) => s.currency)
 
   const meta = ASSET_CLASS_META[asset.assetClass]
   const hasPosition = position.hasPosition
 
+  function openAssetPage() {
+    router.push(`/assets/${asset.ticker.toLowerCase()}`)
+  }
+
   return (
     <div
+      onClick={openAssetPage}
       className={cn(
-        'flex items-center gap-4 px-5 transition-colors duration-150 group',
+        'flex items-center gap-4 px-5 transition-colors duration-150 group cursor-pointer hover:bg-surface-raised/60',
         compact ? 'py-3' : 'py-4'
       )}
     >
@@ -37,9 +44,7 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
 
       <div className="flex-1 min-w-0">
         <p className="text-data-sm font-semibold text-ink truncate">{asset.ticker}</p>
-        {!compact && (
-          <p className="text-data-xs text-ink-muted truncate">{asset.name}</p>
-        )}
+        {!compact && <p className="text-data-xs text-ink-muted truncate">{asset.name}</p>}
       </div>
 
       {!compact && (
@@ -58,7 +63,7 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
           {hasPosition ? (
             <>
               <p className="font-mono text-data-sm text-ink">
-                {formatNumber(position.quantity, 8)}
+                {formatNumber(position.quantity, asset.assetClass === 'crypto' ? 8 : 4)}
               </p>
               <p className="font-mono text-data-xs text-ink-faint">
                 Ø {formatCurrency(position.avgCostBasis, currency)}
@@ -72,17 +77,9 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
 
       <div className="text-right hidden sm:block w-20">
         {hasPosition ? (
-          <div className="flex items-center justify-end gap-1.5">
-            {position.isLivePrice && (
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse-slow shrink-0"
-                title="Live-Kurs"
-              />
-            )}
-            <p className="font-mono text-data-sm text-ink">
-              {formatCurrency(position.currentPrice, currency)}
-            </p>
-          </div>
+          <p className="font-mono text-data-sm text-ink">
+            {formatCurrency(position.currentPrice, currency)}
+          </p>
         ) : (
           <p className="font-mono text-data-sm text-ink-faint">—</p>
         )}
@@ -106,7 +103,15 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
       {(onTrade || onRemove) && (
         <div className="flex items-center gap-1 shrink-0">
           {onTrade && (
-            <Button variant="ghost" size="icon" onClick={onTrade} title="Transaktion erfassen">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation()
+                onTrade()
+              }}
+              title="Transaktion erfassen"
+            >
               <Plus size={14} strokeWidth={2.5} />
             </Button>
           )}
@@ -115,7 +120,10 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
             <Button
               variant="ghost"
               size="icon"
-              onClick={onRemove}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove()
+              }}
               title="Asset entfernen"
               className="opacity-0 group-hover:opacity-100 hover:text-loss"
             >
