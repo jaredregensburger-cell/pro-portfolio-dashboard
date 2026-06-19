@@ -104,9 +104,9 @@ export function OnboardingFlow() {
   })
 
   if (error) {
-    alert(error.message)
-    return
-  }
+  alert(`Registrierung fehlgeschlagen: ${error.message}`)
+  return
+}
 
   setProfile({
     displayName: displayName.trim(),
