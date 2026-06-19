@@ -41,7 +41,7 @@ export function LandingDashboardPreview() {
 
   return (
     <div className="h-full rounded-3xl border border-border bg-surface/80 p-4 shadow-glass-lg backdrop-blur-glass">
-      <div className="rounded-2xl border border-border bg-void p-5">
+      <div className="h-full rounded-2xl border border-border bg-void p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-data-xs uppercase tracking-wide text-ink-faint">
