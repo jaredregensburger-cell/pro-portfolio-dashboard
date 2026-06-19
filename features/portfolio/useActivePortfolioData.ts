@@ -77,54 +77,94 @@ export function useActivePortfolioData(): ActivePortfolioData {
       return
     }
 
-    const { data: portfolio } = await supabase
+    let portfolio: DbPortfolio | null = null
+
+    const { data: defaultPortfolio, error: defaultError } = await supabase
       .from('portfolios')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_default', true)
       .maybeSingle()
 
-    if (!portfolio) {
-      setPortfolioId(null)
-      setAssets([])
-      setTransactions([])
-      setHasHydrated(true)
-      return
+    if (defaultError) {
+      console.error('Default portfolio load error:', defaultError)
     }
 
-    const [{ data: dbAssets }, { data: dbTransactions }] =
+    portfolio = defaultPortfolio as DbPortfolio | null
+
+    if (!portfolio) {
+      const { data: firstPortfolio, error: firstError } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (firstError) {
+        console.error('First portfolio load error:', firstError)
+      }
+
+      portfolio = firstPortfolio as DbPortfolio | null
+    }
+
+    if (!portfolio) {
+      const { data: createdPortfolio, error: createError } = await supabase
+        .from('portfolios')
+        .insert({
+          user_id: user.id,
+          name: 'Mein Portfolio',
+          description: 'Default portfolio',
+          currency: 'EUR',
+          is_default: true,
+        })
+        .select('*')
+        .single()
+
+      if (createError) {
+        console.error('Portfolio create error:', createError)
+        setPortfolioId(null)
+        setAssets([])
+        setTransactions([])
+        setHasHydrated(true)
+        return
+      }
+
+      portfolio = createdPortfolio as DbPortfolio
+    }
+
+    const [{ data: dbAssets, error: assetsError }, { data: dbTransactions, error: txError }] =
       await Promise.all([
         supabase
           .from('assets')
           .select('*')
-          .eq('portfolio_id', portfolio.id),
+          .eq('portfolio_id', portfolio.id)
+          .order('added_at', { ascending: true }),
 
         supabase
           .from('transactions')
           .select('*')
-          .eq('portfolio_id', portfolio.id),
+          .eq('portfolio_id', portfolio.id)
+          .order('executed_at', { ascending: false }),
       ])
 
-    const mappedAssets: SimAsset[] = ((dbAssets ?? []) as DbAsset[]).map(
-      (asset) => ({
-        id: asset.id,
-        portfolioId: asset.portfolio_id,
-        ticker: asset.ticker,
-        name: asset.name,
-        assetClass: mapAssetClass(asset.asset_class),
-        currency: asset.currency,
-        addedAt:
-          asset.added_at ??
-          asset.created_at ??
-          new Date().toISOString(),
-      })
-    )
+    if (assetsError) console.error('Assets load error:', assetsError)
+    if (txError) console.error('Transactions load error:', txError)
 
-    const mappedTransactions: SimTransaction[] = (
-      (dbTransactions ?? []) as DbTransaction[]
-    )
+    const mappedAssets: SimAsset[] = ((dbAssets ?? []) as DbAsset[]).map((asset) => ({
+      id: asset.id,
+      portfolioId: asset.portfolio_id,
+      ticker: asset.ticker,
+      name: asset.name,
+      assetClass: mapAssetClass(asset.asset_class),
+      currency: asset.currency,
+      addedAt: asset.added_at ?? asset.created_at ?? new Date().toISOString(),
+    }))
+
+    const mappedTransactions: SimTransaction[] = ((dbTransactions ?? []) as DbTransaction[])
+      .filter((tx) => tx.type === 'buy' || tx.type === 'sell')
       .filter((tx) => tx.asset_id)
-      .filter((tx) => tx.quantity && tx.price)
+      .filter((tx) => tx.quantity !== null && tx.price !== null)
       .map((tx) => ({
         id: tx.id,
         assetId: tx.asset_id as string,
@@ -150,16 +190,10 @@ export function useActivePortfolioData(): ActivePortfolioData {
       load()
     }
 
-    window.addEventListener(
-      'folio:portfolio-changed',
-      handleRefresh
-    )
+    window.addEventListener('folio:portfolio-changed', handleRefresh)
 
     return () => {
-      window.removeEventListener(
-        'folio:portfolio-changed',
-        handleRefresh
-      )
+      window.removeEventListener('folio:portfolio-changed', handleRefresh)
     }
   }, [load])
 
