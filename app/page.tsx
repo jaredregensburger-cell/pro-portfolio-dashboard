@@ -25,7 +25,7 @@ export default function HomePage() {
           <LiveTicker />
         </div>
 
-        <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        <div className="grid w-full max-w-5xl grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-border bg-surface/80 p-6 shadow-glass-lg backdrop-blur-glass">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-raised px-3 py-1.5 text-data-sm text-ink-muted">
               <Sparkles size={14} className="text-signal" />
