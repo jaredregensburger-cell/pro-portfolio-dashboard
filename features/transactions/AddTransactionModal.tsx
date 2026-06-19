@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Modal, Input, Select, Button, SegmentedControl, EmptyState } from '@/components/ui'
-import { useModalStore, useSimulationStore, useUIStore } from '@/store'
+import { useModalStore, useUIStore } from '@/store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { computeAssetPosition } from '@/lib/calculations'
 import { showSuccessToast } from '@/store/toast.store'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import { ASSET_CLASS_META } from '@/lib/constants'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SimTransactionType } from '@/types/simulation'
 import { PackagePlus } from 'lucide-react'
 
@@ -20,15 +21,15 @@ export function AddTransactionModal() {
 
   const currency = useUIStore((s) => s.currency)
 
-  const { assets, transactions } = useActivePortfolioData()
+  const { portfolioId, assets, transactions, reload } = useActivePortfolioData()
   const { livePrices } = useLiveMarketDataContext()
-  const addTransaction = useSimulationStore((s) => s.addTransaction)
 
   const isOpen = activeModal === 'add-transaction'
 
   const [assetId, setAssetId] = useState('')
   const [type, setType] = useState<SimTransactionType>('buy')
   const [quantity, setQuantity] = useState('')
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export function AddTransactionModal() {
     setAssetId(initialAssetId)
     setType(context.type ?? 'buy')
     setQuantity('')
+    setSaving(false)
     setError(null)
   }, [isOpen, context.assetId, context.type, assets])
 
@@ -51,8 +53,7 @@ export function AddTransactionModal() {
 
   const quantityNum = parseFloat(quantity) || 0
 
-  const livePrice =
-    selectedAsset ? livePrices.get(selectedAsset.ticker) : undefined
+  const livePrice = selectedAsset ? livePrices.get(selectedAsset.ticker) : undefined
 
   const transactionPrice =
     livePrice && livePrice > 0
@@ -65,50 +66,75 @@ export function AddTransactionModal() {
     closeModal()
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError(null)
+    setSaving(true)
 
-    if (!assetId || !selectedAsset) {
-      setError('Bitte wähle ein Asset.')
-      return
+    try {
+      if (!portfolioId) {
+        setError('Kein Portfolio gefunden.')
+        return
+      }
+
+      if (!assetId || !selectedAsset) {
+        setError('Bitte wähle ein Asset.')
+        return
+      }
+
+      if (quantityNum <= 0) {
+        setError(
+          type === 'buy'
+            ? 'Dazugekaufte Menge muss größer als 0 sein.'
+            : 'Verkaufte Menge muss größer als 0 sein.'
+        )
+        return
+      }
+
+      if (type === 'sell' && position?.hasPosition && quantityNum > position.quantity) {
+        setError(`Du kannst maximal ${formatNumber(position.quantity, 8)} ${selectedAsset.ticker} verkaufen.`)
+        return
+      }
+
+      if (transactionPrice <= 0) {
+        setError('Für dieses Asset ist noch kein Kurs verfügbar.')
+        return
+      }
+
+      const supabase = createSupabaseBrowserClient()
+
+      const { error: insertError } = await supabase
+        .from('transactions')
+        .insert({
+          portfolio_id: portfolioId,
+          asset_id: assetId,
+          type,
+          status: 'completed',
+          quantity: quantityNum,
+          price: transactionPrice,
+          total_amount: estimatedValue,
+          fee: 0,
+          currency,
+          note: type === 'buy' ? 'Dazugekauft' : 'Verkauft',
+          executed_at: new Date().toISOString(),
+        })
+
+      if (insertError) throw insertError
+
+      showSuccessToast(
+        type === 'buy' ? 'Kauf erfasst' : 'Verkauf erfasst',
+        `${formatNumber(quantityNum, 8)} ${selectedAsset.ticker} · ${formatCurrency(estimatedValue, currency)}`
+      )
+
+      window.dispatchEvent(new Event('folio:portfolio-changed'))
+      await reload()
+      handleClose()
+    } catch (err) {
+      console.error('Add transaction error:', err)
+      setError(err instanceof Error ? err.message : 'Transaktion konnte nicht gespeichert werden.')
+    } finally {
+      setSaving(false)
     }
-
-    if (quantityNum <= 0) {
-      setError(type === 'buy' ? 'Dazugekaufte Menge muss größer als 0 sein.' : 'Verkaufte Menge muss größer als 0 sein.')
-      return
-    }
-
-    if (type === 'sell' && position?.hasPosition && quantityNum > position.quantity) {
-      setError(`Du kannst maximal ${formatNumber(position.quantity, 8)} ${selectedAsset.ticker} verkaufen.`)
-      return
-    }
-
-    if (transactionPrice <= 0) {
-      setError('Für dieses Asset ist noch kein Kurs verfügbar.')
-      return
-    }
-
-    const result = addTransaction({
-      assetId,
-      type,
-      quantity: quantityNum,
-      price: transactionPrice,
-      fee: 0,
-      executedAt: new Date().toISOString(),
-      note: type === 'buy' ? 'Dazugekauft' : 'Verkauft',
-    })
-
-    if (!result.success) {
-      setError(result.error)
-      return
-    }
-
-    showSuccessToast(
-      type === 'buy' ? 'Kauf erfasst' : 'Verkauf erfasst',
-      `${formatNumber(quantityNum, 8)} ${selectedAsset.ticker} · ${formatCurrency(estimatedValue, currency)}`
-    )
-
-    handleClose()
   }
 
   if (isOpen && assets.length === 0) {
@@ -221,8 +247,8 @@ export function AddTransactionModal() {
             Abbrechen
           </Button>
 
-          <Button type="submit" variant="primary">
-            {type === 'buy' ? 'Kauf erfassen' : 'Verkauf erfassen'}
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? 'Speichern…' : type === 'buy' ? 'Kauf erfassen' : 'Verkauf erfassen'}
           </Button>
         </div>
       </form>
