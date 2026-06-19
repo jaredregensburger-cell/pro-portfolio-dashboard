@@ -205,7 +205,7 @@ export function AssetDetailShell({ ticker }: { ticker: string }) {
             })}
           </div>
         )}
-      </GlassCard>
+      </GlassCard> 
     </div>
   )
 }
