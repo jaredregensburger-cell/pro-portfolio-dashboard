@@ -26,7 +26,7 @@ export function LandingDashboardPreview() {
     return () => window.clearInterval(interval)
   }, [])
 
-  const shown = items.slice(0, 4)
+  const shown = items.slice(0, 3)
   const mockValue = shown.reduce((sum, item) => sum + item.price, 0)
 
   return (
