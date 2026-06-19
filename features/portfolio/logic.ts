@@ -44,26 +44,17 @@ export function computeAssetPosition(
 
   const quantity = Math.max(totalBuyQty - totalSellQty, 0)
 
-  const isInitialSnapshotOnly =
-    txns.length === 1 &&
-    txns[0]?.type === 'buy' &&
-    (
-      txns[0]?.note === 'START_SNAPSHOT' ||
-      txns[0]?.note === 'Startbestand' ||
-      txns[0]?.note === 'Startbestand beim Asset-Anlegen'
-    )
-
   const livePrice = livePrices?.get(asset.ticker)
 
-  const isLivePrice =
-    livePrice !== undefined &&
-    totalBuyQty > 0 &&
-    quantity > 0 &&
-    !isInitialSnapshotOnly
+const isLivePrice =
+  livePrice !== undefined &&
+  livePrice > 0 &&
+  totalBuyQty > 0 &&
+  quantity > 0
 
-  if (isLivePrice) {
-    currentPrice = livePrice
-  }
+if (isLivePrice) {
+  currentPrice = livePrice
+}
 
   const avgCostBasis = totalBuyQty > 0 ? totalBuyCost / totalBuyQty : 0
   const currentValue = quantity * currentPrice
