@@ -8,6 +8,7 @@ import { OnboardingOptionCard } from './OnboardingOptionCard'
 import { OnboardingProgress } from './OnboardingProgress'
 import type { InvestorType, InvestorProfile } from '@/types/simulation'
 import { ArrowLeft, ArrowRight, Zap, Sparkles } from 'lucide-react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const STEPS = ['investorType', 'primaryGoal', 'experienceLevel', 'account'] as const
 type Step = (typeof STEPS)[number]
@@ -85,27 +86,31 @@ export function OnboardingFlow() {
       email.trim().length > 0 &&
       password.trim().length >= 6)
 
-  function finishRegistration() {
-  const account = {
-    name: displayName.trim(),
+  async function finishRegistration() {
+  const supabase = createSupabaseBrowserClient()
+
+  const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
-    password: password,
-    registeredAt: new Date().toISOString(),
+    password,
+    options: {
+      data: {
+        display_name: displayName.trim(),
+      },
+      emailRedirectTo:
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : undefined,
+    },
+  })
+
+  if (error) {
+    alert(error.message)
+    return
   }
 
-  localStorage.setItem('folio-demo-account', JSON.stringify(account))
-
-  localStorage.setItem(
-    'folio-demo-session',
-    JSON.stringify({
-      email: account.email,
-      loggedInAt: new Date().toISOString(),
-    })
-  )
-
   setProfile({
-    displayName: account.name,
-    email: account.email,
+    displayName: displayName.trim(),
+    email: email.trim(),
   })
 
   completeOnboarding({
@@ -114,19 +119,23 @@ export function OnboardingFlow() {
     experienceLevel: experienceLevel!,
   })
 
-  router.replace('/dashboard' as any)
+  if (data.session) {
+    router.replace('/dashboard' as any)
+  } else {
+    router.replace('/login' as any)
+  }
 }
 
-  function handleNext() {
-    if (!canProceed) return
+  async function handleNext() {
+  if (!canProceed) return
 
-    if (isLastStep) {
-      finishRegistration()
-      return
-    }
-
-    setStepIndex((i) => i + 1)
+  if (isLastStep) {
+    await finishRegistration()
+    return
   }
+
+  setStepIndex((i) => i + 1)
+}
 
   function handleBack() {
     setStepIndex((i) => Math.max(0, i - 1))
