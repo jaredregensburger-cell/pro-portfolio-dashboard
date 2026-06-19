@@ -3,10 +3,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Search, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal, Input, Select, Button } from '@/components/ui'
-import { useModalStore, useWatchlistStore } from '@/store'
+import { useModalStore, useUIStore } from '@/store'
 import { showSuccessToast } from '@/store/toast.store'
 import { ASSET_CLASS_OPTIONS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { AssetClass } from '@/types'
 import type { GlobalAsset } from '@/features/assets/assetTypes'
 
@@ -14,6 +15,12 @@ const initialState = {
   ticker: '',
   name: '',
   assetClass: 'stock' as AssetClass,
+}
+
+function toDbAssetClass(assetClass: AssetClass) {
+  if (assetClass === 'stock') return 'equity'
+  if (assetClass === 'metal') return 'commodity'
+  return assetClass
 }
 
 function AssetSuggestionRow({
@@ -59,7 +66,7 @@ export function AddWatchlistItemModal() {
   const activeModal = useModalStore((s) => s.activeModal)
   const context = useModalStore((s) => s.context)
   const closeModal = useModalStore((s) => s.closeModal)
-  const addItem = useWatchlistStore((s) => s.addItem)
+  const currency = useUIStore((s) => s.currency)
 
   const isOpen = activeModal === 'add-watchlist-item'
 
@@ -67,6 +74,7 @@ export function AddWatchlistItemModal() {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<GlobalAsset[]>([])
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -84,6 +92,7 @@ export function AddWatchlistItemModal() {
     setQuery(ticker || name)
     setSuggestions([])
     setLoading(false)
+    setSaving(false)
     setError(null)
   }, [isOpen, context.ticker, context.name])
 
@@ -142,22 +151,64 @@ export function AddWatchlistItemModal() {
     setError(null)
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError(null)
+    setSaving(true)
 
-    const result = addItem({
-      ticker: form.ticker,
-      name: form.name,
-      assetClass: form.assetClass,
-    })
+    try {
+      const ticker = form.ticker.trim().toUpperCase()
+      const name = form.name.trim()
 
-    if (!result.success) {
-      setError(result.error)
-      return
+      if (!ticker) {
+        setError('Symbol ist erforderlich.')
+        return
+      }
+
+      if (!name) {
+        setError('Name ist erforderlich.')
+        return
+      }
+
+      const supabase = createSupabaseBrowserClient()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setError('Du musst eingeloggt sein.')
+        return
+      }
+
+      const { error: insertError } = await supabase
+        .from('watchlist_items')
+        .insert({
+          user_id: user.id,
+          ticker,
+          name,
+          asset_class: toDbAssetClass(form.assetClass),
+          currency: currency || 'EUR',
+        })
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          setError(`${ticker} ist bereits auf deiner Watchlist.`)
+          return
+        }
+
+        throw insertError
+      }
+
+      showSuccessToast(`${ticker} beobachtet`, 'Zur Watchlist hinzugefügt.')
+      window.dispatchEvent(new Event('folio:watchlist-changed'))
+      closeModal()
+    } catch (err) {
+      console.error('Add watchlist item error:', err)
+      setError(err instanceof Error ? err.message : 'Watchlist-Eintrag konnte nicht gespeichert werden.')
+    } finally {
+      setSaving(false)
     }
-
-    showSuccessToast(`${result.item.ticker} beobachtet`, 'Zur Watchlist hinzugefügt.')
-    closeModal()
   }
 
   return (
@@ -261,8 +312,9 @@ export function AddWatchlistItemModal() {
           <Button type="button" variant="ghost" onClick={closeModal}>
             Abbrechen
           </Button>
-          <Button type="submit" variant="primary">
-            Beobachten
+
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? 'Speichern…' : 'Beobachten'}
           </Button>
         </div>
       </form>
