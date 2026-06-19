@@ -61,9 +61,6 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-void bg-grid overflow-hidden">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-4 py-10 lg:px-8">
-        <div className="mb-8 w-full">
-          <LiveTicker />
-        </div>
 
         <div className="mx-auto w-full max-w-md">
           <form
