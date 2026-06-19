@@ -28,13 +28,16 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
 
   const firstName = displayName?.trim()?.split(' ')[0] || 'Investor'
 
-  function handleLogout() {
-    setUserOpen(false)
+  async function handleLogout() {
+  const supabase = createSupabaseBrowserClient()
 
-    localStorage.removeItem('folio-demo-user')
+  await supabase.auth.signOut()
 
-    router.push('/' as any)
-  }
+  setUserOpen(false)
+
+  router.replace('/' as any)
+  router.refresh()
+}
 
   return (
     <header className="relative flex h-topbar items-center justify-between gap-3 px-4 sm:px-6 border-b border-border bg-surface/80 backdrop-blur-glass shrink-0">
