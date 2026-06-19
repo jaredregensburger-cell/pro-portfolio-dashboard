@@ -3,9 +3,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Search, Zap, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal, Input, Select, Button } from '@/components/ui'
-import { useModalStore, useSimulationStore, useUIStore } from '@/store'
+import { useModalStore, useUIStore } from '@/store'
 import { ASSET_CLASS_OPTIONS } from '@/lib/constants'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { AssetClass } from '@/types'
 import type { GlobalAsset } from './assetTypes'
 
@@ -31,6 +32,12 @@ function getPrefix(currency: string) {
   if (currency === 'CHF') return 'Fr'
   if (currency === 'JPY') return '¥'
   return '$'
+}
+
+function toDbAssetClass(assetClass: AssetClass) {
+  if (assetClass === 'stock') return 'equity'
+  if (assetClass === 'metal') return 'commodity'
+  return assetClass
 }
 
 function AssetPickRow({
@@ -108,7 +115,6 @@ function SearchInput({
 export function AddAssetModal() {
   const activeModal = useModalStore((s) => s.activeModal)
   const closeModal = useModalStore((s) => s.closeModal)
-  const addAsset = useSimulationStore((s) => s.addAsset)
   const displayCurrency = useUIStore((s) => s.currency)
 
   const isOpen = activeModal === 'add-asset'
@@ -117,6 +123,7 @@ export function AddAssetModal() {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<GlobalAsset[]>([])
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [manualForm, setManualForm] = useState(initialManualState)
   const [selectedCatalogAsset, setSelectedCatalogAsset] = useState<GlobalAsset | null>(null)
 
@@ -131,6 +138,7 @@ export function AddAssetModal() {
     setSearch('')
     setResults([])
     setLoading(false)
+    setSaving(false)
     setManualForm(initialManualState)
     setSelectedCatalogAsset(null)
     setOwnedQuantity('')
@@ -191,38 +199,134 @@ export function AddAssetModal() {
       ? ownedValueNum / ownedQuantityNum
       : 0
 
-  function submitAsset(input: {
+  async function getOrCreateDefaultPortfolio(userId: string) {
+    const supabase = createSupabaseBrowserClient()
+
+    const { data: portfolio, error } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle()
+
+    if (error) throw error
+    if (portfolio) return portfolio
+
+    const { data: created, error: createError } = await supabase
+      .from('portfolios')
+      .insert({
+        user_id: userId,
+        name: 'Mein Portfolio',
+        description: 'Default portfolio',
+        currency: displayCurrency || 'EUR',
+        is_default: true,
+      })
+      .select('*')
+      .single()
+
+    if (createError) throw createError
+    return created
+  }
+
+  async function submitAsset(input: {
     ticker: string
     name: string
     assetClass: AssetClass
   }) {
     setError(null)
+    setSaving(true)
 
-    if ((ownedQuantityNum > 0 && ownedValueNum <= 0) || (ownedValueNum > 0 && ownedQuantityNum <= 0)) {
-      setError('Bitte trage Menge und aktuellen Wert ein — oder lasse beide Felder leer.')
-      return
+    try {
+      if ((ownedQuantityNum > 0 && ownedValueNum <= 0) || (ownedValueNum > 0 && ownedQuantityNum <= 0)) {
+        setError('Bitte trage Menge und aktuellen Wert ein — oder lasse beide Felder leer.')
+        return
+      }
+
+      const ticker = input.ticker.trim().toUpperCase()
+      const name = input.name.trim()
+
+      if (!ticker) {
+        setError('Symbol ist erforderlich.')
+        return
+      }
+
+      if (!name) {
+        setError('Name ist erforderlich.')
+        return
+      }
+
+      const supabase = createSupabaseBrowserClient()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setError('Du musst eingeloggt sein.')
+        return
+      }
+
+      const portfolio = await getOrCreateDefaultPortfolio(user.id)
+
+      const { data: existingAsset, error: existingError } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('portfolio_id', portfolio.id)
+        .eq('ticker', ticker)
+        .maybeSingle()
+
+      if (existingError) throw existingError
+
+      if (existingAsset) {
+        setError(`${ticker} existiert bereits in diesem Portfolio.`)
+        return
+      }
+
+      const price = calculatedPrice > 0 ? calculatedPrice : 0
+
+      const { data: createdAsset, error: assetError } = await supabase
+        .from('assets')
+        .insert({
+          portfolio_id: portfolio.id,
+          ticker,
+          name,
+          asset_class: toDbAssetClass(input.assetClass),
+          current_price: price,
+          currency: displayCurrency || 'EUR',
+        })
+        .select('*')
+        .single()
+
+      if (assetError) throw assetError
+
+      if (ownedQuantityNum > 0 && ownedValueNum > 0) {
+        const { error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            portfolio_id: portfolio.id,
+            asset_id: createdAsset.id,
+            type: 'buy',
+            status: 'completed',
+            quantity: ownedQuantityNum,
+            price,
+            total_amount: ownedValueNum,
+            fee: 0,
+            currency: displayCurrency || 'EUR',
+            note: 'Startbestand',
+            executed_at: new Date().toISOString(),
+          })
+
+        if (txError) throw txError
+      }
+
+      window.dispatchEvent(new Event('folio:portfolio-changed'))
+      closeModal()
+    } catch (err) {
+      console.error('Add asset error:', err)
+      setError(err instanceof Error ? err.message : 'Asset konnte nicht gespeichert werden.')
+    } finally {
+      setSaving(false)
     }
-
-    const result = addAsset({
-      ticker: input.ticker,
-      name: input.name,
-      assetClass: input.assetClass,
-      currency: displayCurrency,
-      initialQuantity: ownedQuantityNum,
-      initialValue: ownedValueNum,
-      initialFee: 0,
-      initialNote:
-        ownedQuantityNum > 0 && ownedValueNum > 0
-          ? 'START_SNAPSHOT'
-          : undefined,
-    })
-
-    if (!result.success) {
-      setError(result.error)
-      return
-    }
-
-    closeModal()
   }
 
   function handleCatalogSubmit(e: FormEvent) {
@@ -375,8 +479,8 @@ export function AddAssetModal() {
                 <Button type="button" variant="ghost" onClick={closeModal}>
                   Abbrechen
                 </Button>
-                <Button type="submit" variant="primary">
-                  Asset hinzufügen
+                <Button type="submit" variant="primary" disabled={saving}>
+                  {saving ? 'Speichern…' : 'Asset hinzufügen'}
                 </Button>
               </div>
             </>
@@ -441,8 +545,8 @@ export function AddAssetModal() {
             <Button type="button" variant="ghost" onClick={closeModal}>
               Abbrechen
             </Button>
-            <Button type="submit" variant="primary">
-              Asset anlegen
+            <Button type="submit" variant="primary" disabled={saving}>
+              {saving ? 'Speichern…' : 'Asset anlegen'}
             </Button>
           </div>
         </form>
