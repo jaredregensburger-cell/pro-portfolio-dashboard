@@ -58,7 +58,7 @@ export function AssetRow({ asset, position, compact = false, onTrade, onRemove }
           {hasPosition ? (
             <>
               <p className="font-mono text-data-sm text-ink">
-                {formatNumber(position.quantity, 4)}
+                {formatNumber(position.quantity, 8)}
               </p>
               <p className="font-mono text-data-xs text-ink-faint">
                 Ø {formatCurrency(position.avgCostBasis, currency)}
