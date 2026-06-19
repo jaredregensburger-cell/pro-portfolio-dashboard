@@ -10,7 +10,7 @@ type TickerItem = {
   currency: string
 }
 
-const REFRESH_MS = 1000
+const REFRESH_MS = 60_000
 
 export function LiveTicker() {
   const [items, setItems] = useState<TickerItem[]>([])
