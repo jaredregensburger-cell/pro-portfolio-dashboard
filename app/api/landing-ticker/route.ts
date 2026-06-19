@@ -1,41 +1,62 @@
 import { NextResponse } from 'next/server'
 
-const ASSETS = [
-  { ticker: 'BTC', assetClass: 'crypto' },
-  { ticker: 'AAPL', assetClass: 'stock' },
-  { ticker: 'GOOGL', assetClass: 'stock' },
-  { ticker: 'MSFT', assetClass: 'stock' },
-  { ticker: 'NVDA', assetClass: 'stock' },
-  { ticker: 'TSLA', assetClass: 'stock' },
+const TWELVE_BASE_URL = 'https://api.twelvedata.com'
+
+const LANDING_ASSETS = [
+  { symbol: 'BTC/EUR', label: 'BTC' },
+  { symbol: 'AAPL', label: 'AAPL' },
+  { symbol: 'GOOGL', label: 'GOOGL' },
+  { symbol: 'MSFT', label: 'MSFT' },
+  { symbol: 'NVDA', label: 'NVDA' },
+  { symbol: 'TSLA', label: 'TSLA' },
 ]
 
-export async function GET() {
-  try {
-    const results = await Promise.all(
-      ASSETS.map(async (asset) => {
-        const base =
-          process.env.NODE_ENV === 'development'
-            ? 'http://localhost:3000'
-            : process.env.NEXT_PUBLIC_APP_URL
+async function fetchQuote(symbol: string, apiKey: string) {
+  const url = new URL('/quote', TWELVE_BASE_URL)
+  url.searchParams.set('symbol', symbol)
+  url.searchParams.set('apikey', apiKey)
 
-        const response = await fetch(
-          `${base}/api/market-price?ticker=${asset.ticker}&assetClass=${asset.assetClass}&currency=EUR`,
-          { cache: 'no-store' }
-        )
+  const res = await fetch(url.toString(), { cache: 'no-store' })
+  if (!res.ok) return null
 
-        if (!response.ok) return null
+  const data = await res.json()
+  if (data.status === 'error') return null
 
-        const data = await response.json()
+  const price = Number(data.close ?? data.price ?? data.previous_close)
+  const changePct = Number(data.percent_change ?? 0)
 
-        return {
-          symbol: asset.ticker,
-          price: data.price,
-        }
-      })
-    )
+  if (!Number.isFinite(price)) return null
 
-    return NextResponse.json(results.filter(Boolean))
-  } catch {
-    return NextResponse.json([])
+  return {
+    price,
+    changePct,
+    currency: String(data.currency ?? (symbol.includes('/EUR') ? 'EUR' : 'USD')),
   }
+}
+
+export async function GET() {
+  const apiKey = process.env.TWELVE_DATA_API_KEY
+
+  if (!apiKey) {
+    return NextResponse.json({ items: [] })
+  }
+
+  const items = await Promise.all(
+    LANDING_ASSETS.map(async (asset) => {
+      const quote = await fetchQuote(asset.symbol, apiKey)
+      if (!quote) return null
+
+      return {
+        symbol: asset.label,
+        price: quote.price,
+        changePct: quote.changePct,
+        currency: quote.currency,
+      }
+    })
+  )
+
+  return NextResponse.json({
+    items: items.filter(Boolean),
+    updatedAt: new Date().toISOString(),
+  })
 }
