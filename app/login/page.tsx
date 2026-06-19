@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Zap } from 'lucide-react'
 import { useUIStore } from '@/store'
-import { LiveTicker } from '@/components/landing/LiveTicker'
 
 type DemoAccount = {
   name: string
