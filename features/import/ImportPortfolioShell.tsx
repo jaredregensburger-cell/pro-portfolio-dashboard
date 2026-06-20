@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { showSuccessToast } from '@/store/toast.store'
 import { Upload, FileText, X, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { GlassCard, Button } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
