@@ -104,6 +104,11 @@ export function DashboardShell() {
   analytics.positions,
   analytics.totalValue
 )
+  
+  const portfolioImprovements = getPortfolioImprovements(
+  analytics.positions,
+  analytics.totalValue
+)
 
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime())
@@ -227,6 +232,10 @@ export function DashboardShell() {
       </GlassCard>
 
       <PortfolioInsights score={portfolioScore} />
+
+<PortfolioOptimizer improvements={portfolioImprovements} />
+
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
