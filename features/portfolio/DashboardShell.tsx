@@ -1,14 +1,14 @@
 'use client'
 
-import { getPortfolioImprovements } from '@/features/portfolio/portfolioOptimizer'
-import { PortfolioOptimizer } from '@/features/portfolio/PortfolioOptimizer'
-import { PortfolioInsights } from '@/features/portfolio/PortfolioInsights'
-import { calculatePortfolioScore } from '@/features/portfolio/portfolioScore'
 import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, SkeletonTable } from '@/components/ui'
 import { PortfolioValueChart } from '@/components/charts'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
 import { usePortfolioSnapshots } from '@/features/portfolio/usePortfolioSnapshots'
+import { calculatePortfolioScore } from '@/features/portfolio/portfolioScore'
+import { PortfolioInsights } from '@/features/portfolio/PortfolioInsights'
+import { getPortfolioImprovements } from '@/features/portfolio/portfolioOptimizer'
+import { PortfolioOptimizer } from '@/features/portfolio/PortfolioOptimizer'
 import { usePortfolioStore, useModalStore, useUIStore } from '@/store'
 import {
   getPortfolioAnalytics,
@@ -23,7 +23,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   Trophy,
-  TrendingDown,
   Wallet,
   ArrowDownLeft,
   ArrowUpRight,
@@ -53,62 +52,62 @@ export function DashboardShell() {
   }
 
   if (assets.length === 0) {
-  return (
-    <GlassCard className="max-w-3xl mx-auto text-center py-16">
-      <div className="space-y-6">
-        <div>
-          <p className="text-signal font-semibold mb-2">
-            Willkommen bei Folio AI
-          </p>
+    return (
+      <GlassCard className="max-w-3xl mx-auto text-center py-16">
+        <div className="space-y-6">
+          <div>
+            <p className="text-signal font-semibold mb-2">
+              Willkommen bei Folio AI
+            </p>
 
-          <h1 className="text-3xl font-bold text-ink">
-            In 60 Sekunden zu deinem fertigen Portfolio
-          </h1>
+            <h1 className="text-3xl font-bold text-ink">
+              In 60 Sekunden zu deinem fertigen Portfolio
+            </h1>
 
-          <p className="mt-4 text-ink-muted max-w-xl mx-auto">
-            Verbinde deinen Broker oder importiere dein Portfolio.
-            Folio analysiert automatisch deine Positionen,
-            Risiken und Chancen.
-          </p>
-        </div>
-
-        <div className="grid gap-3 max-w-lg mx-auto text-left">
-          <div className="rounded-xl border border-border p-4">
-            1. Broker auswählen
+            <p className="mt-4 text-ink-muted max-w-xl mx-auto">
+              Verbinde deinen Broker oder importiere dein Portfolio.
+              Folio analysiert automatisch deine Positionen, Risiken und Chancen.
+            </p>
           </div>
 
-          <div className="rounded-xl border border-border p-4">
-            2. CSV hochladen
+          <div className="grid gap-3 max-w-lg mx-auto text-left">
+            <div className="rounded-xl border border-border p-4">
+              1. Broker auswählen
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              2. CSV hochladen
+            </div>
+
+            <div className="rounded-xl border border-border p-4">
+              3. Portfolio Analyse erhalten
+            </div>
           </div>
 
-          <div className="rounded-xl border border-border p-4">
-            3. Portfolio Analyse erhalten
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => window.location.href = '/import'}
+              className="px-5 py-3 rounded-xl bg-signal text-white font-medium"
+            >
+              Portfolio importieren
+            </button>
           </div>
         </div>
-
-        <div className="flex justify-center gap-3">
-          <button
-            onClick={() => window.location.href = '/import'}
-            className="px-5 py-3 rounded-xl bg-signal text-white font-medium"
-          >
-            Portfolio importieren
-          </button>
-        </div>
-      </div>
-    </GlassCard>
-  )
-}
+      </GlassCard>
+    )
+  }
 
   const analytics = getPortfolioAnalytics(assets, transactions, livePrices)
+
   const portfolioScore = calculatePortfolioScore(
-  analytics.positions,
-  analytics.totalValue
-)
-  
+    analytics.positions,
+    analytics.totalValue
+  )
+
   const portfolioImprovements = getPortfolioImprovements(
-  analytics.positions,
-  analytics.totalValue
-)
+    analytics.positions,
+    analytics.totalValue
+  )
 
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime())
@@ -182,23 +181,23 @@ export function DashboardShell() {
         </GlassCard>
 
         <GlassCard accent="signal" className="space-y-3">
-  <p className="text-data-sm text-ink-muted font-medium tracking-wide uppercase">
-    Folio AI Score
-  </p>
+          <p className="text-data-sm text-ink-muted font-medium tracking-wide uppercase">
+            Folio AI Score
+          </p>
 
-  <div className="flex items-end gap-2">
-    <p className="font-mono text-data-3xl font-semibold text-ink">
-      {portfolioScore.score}
-    </p>
-    <p className="pb-1 text-data-sm text-ink-muted">/100</p>
-  </div>
+          <div className="flex items-end gap-2">
+            <p className="font-mono text-data-3xl font-semibold text-ink">
+              {portfolioScore.score}
+            </p>
+            <p className="pb-1 text-data-sm text-ink-muted">/100</p>
+          </div>
 
-  <p className="text-data-sm text-ink-muted">
-    {portfolioScore.label}
-  </p>
-</GlassCard>
+          <p className="text-data-sm text-ink-muted">
+            {portfolioScore.label}
+          </p>
+        </GlassCard>
 
-<PerformerCard label="Best Asset" icon={Trophy} ranked={analytics.bestAsset} accent="gain" />
+        <PerformerCard label="Best Asset" icon={Trophy} ranked={analytics.bestAsset} accent="gain" />
       </div>
 
       <GlassCard padding="none" className="overflow-hidden">
@@ -233,9 +232,7 @@ export function DashboardShell() {
 
       <PortfolioInsights score={portfolioScore} />
 
-<PortfolioOptimizer improvements={portfolioImprovements} />
-
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <PortfolioOptimizer improvements={portfolioImprovements} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
