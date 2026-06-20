@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { label: 'Assets', href: '/assets', icon: TrendingUp },
   { label: 'Watchlist', href: '/watchlist', icon: Star },
   { label: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { label: 'Import', href: '/import', icon: UploadCloud },
 ]
 
 const BOTTOM_ITEMS = [{ label: 'Settings', href: '/settings', icon: Settings }]
