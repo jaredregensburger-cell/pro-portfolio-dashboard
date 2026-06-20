@@ -168,10 +168,12 @@ export function WatchlistShell() {
               <WatchlistRow
                 key={item.id}
                 item={{
-                  id: item.id,
-                  ticker: item.ticker,
-                  name: item.name,
-                  assetClass,
+  id: item.id,
+  ticker: item.ticker,
+  name: item.name,
+  assetClass,
+  addedAt: item.created_at,
+}}
                 }}
                 livePrice={livePrices.get(item.ticker)}
                 isStale={staleTickers.has(item.ticker)}
