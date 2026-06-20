@@ -1,89 +1,110 @@
-'use client'
+import type { RankedPosition } from './logic'
+import { calculatePortfolioScore } from './portfolioScore'
 
-import { cn } from '@/lib/utils'
-import type { PortfolioImprovement } from './portfolioOptimizer'
-import { Sparkles, ArrowUpRight } from 'lucide-react'
-
-interface PortfolioOptimizerProps {
-  improvements: PortfolioImprovement[]
+export type PortfolioImprovement = {
+  title: string
+  description: string
+  impact: number
+  currentScore: number
+  projectedScore: number
+  priority: 'high' | 'medium' | 'low'
 }
 
-function getPriorityLabel(priority: 'high' | 'medium' | 'low') {
-  if (priority === 'high') return 'Hoch'
-  if (priority === 'medium') return 'Mittel'
-  return 'Niedrig'
-}
+export function getPortfolioImprovements(
+  positions: RankedPosition[],
+  totalValue: number
+): PortfolioImprovement[] {
+  const current = calculatePortfolioScore(positions, totalValue)
+  const improvements: PortfolioImprovement[] = []
 
-export function PortfolioOptimizer({ improvements }: PortfolioOptimizerProps) {
-  if (improvements.length === 0) {
-    return null
+  const openPositions = positions.filter((p) => p.position.hasPosition)
+
+  const cryptoValue = openPositions
+    .filter((p) => p.asset.assetClass === 'crypto')
+    .reduce((sum, p) => sum + p.position.currentValue, 0)
+
+  const cryptoPct = totalValue > 0 ? (cryptoValue / totalValue) * 100 : 0
+  const hasEtf = openPositions.some((p) => p.asset.assetClass === 'etf')
+
+  const largestPosition = openPositions[0]
+  const largestPct =
+    largestPosition && totalValue > 0
+      ? (largestPosition.position.currentValue / totalValue) * 100
+      : 0
+
+  if (!hasEtf && openPositions.length >= 2) {
+    const projectedScore = Math.min(100, current.score + 8)
+
+    improvements.push({
+      title: 'ETF-Anteil aufbauen',
+      description:
+        'Ein breit gestreuter ETF kann dein Portfolio stabiler machen und die Abhängigkeit von Einzelpositionen reduzieren.',
+      impact: projectedScore - current.score,
+      currentScore: current.score,
+      projectedScore,
+      priority: 'high',
+    })
   }
 
-  return (
-    <GlassCard className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-signal" />
-            <p className="text-data-sm font-semibold text-ink">
-              Folio AI Optimizer
-            </p>
-          </div>
+  if (cryptoPct > 40) {
+    const impact = cryptoPct > 70 ? 12 : 7
+    const projectedScore = Math.min(100, current.score + impact)
 
-          <p className="mt-1 text-data-sm text-ink-muted">
-            So könntest du deinen Portfolio Score verbessern.
-          </p>
-        </div>
-      </div>
+    improvements.push({
+      title: 'Krypto-Gewichtung reduzieren',
+      description:
+        'Dein Portfolio ist stark von Krypto abhängig. Ein niedrigerer Krypto-Anteil kann Schwankungen reduzieren.',
+      impact: projectedScore - current.score,
+      currentScore: current.score,
+      projectedScore,
+      priority: cryptoPct > 70 ? 'high' : 'medium',
+    })
+  }
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {improvements.map((item) => (
-          <div
-            key={item.title}
-            className="rounded-xl border border-signal/20 bg-signal/10 p-4"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <p className="text-data-sm font-semibold text-ink">
-                {item.title}
-              </p>
+  if (largestPosition && largestPct > 30) {
+    const projectedScore = Math.min(100, current.score + 7)
 
-              <span
-                className={cn(
-                  'rounded-full border border-border px-2 py-0.5 text-data-xs',
-                  item.priority === 'high'
-                    ? 'text-loss'
-                    : item.priority === 'medium'
-                      ? 'text-yellow-400'
-                      : 'text-ink-muted'
-                )}
-              >
-                {getPriorityLabel(item.priority)}
-              </span>
-            </div>
+    improvements.push({
+      title: `${largestPosition.asset.ticker}-Anteil begrenzen`,
+      description:
+        'Deine größte Position ist sehr dominant. Neue Käufe in andere Assets können das Klumpenrisiko senken.',
+      impact: projectedScore - current.score,
+      currentScore: current.score,
+      projectedScore,
+      priority: largestPct > 50 ? 'high' : 'medium',
+    })
+  }
 
-            <p className="text-data-sm text-ink-muted">
-              {item.description}
-            </p>
+  if (openPositions.length < 6) {
+    const projectedScore = Math.min(100, current.score + 6)
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-data-xs text-ink-faint">
-                Score Impact
-              </p>
+    improvements.push({
+      title: 'Mehr Positionen hinzufügen',
+      description:
+        'Weitere Positionen können dein Risiko breiter verteilen und dein Portfolio robuster machen.',
+      impact: projectedScore - current.score,
+      currentScore: current.score,
+      projectedScore,
+      priority: openPositions.length < 3 ? 'high' : 'medium',
+    })
+  }
 
-              <div className="flex items-center gap-1 text-gain">
-                <ArrowUpRight size={14} />
-                <span className="font-mono text-data-sm font-semibold">
-                  +{item.impact}
-                </span>
-              </div>
-            </div>
+  if (totalValue < 1000) {
+    const projectedScore = Math.min(100, current.score + 4)
 
-            <div className="mt-2 font-mono text-data-xs text-ink-muted">
-              {item.currentScore} → {item.projectedScore}
-            </div>
-          </div>
-        ))}
-      </div>
-    </GlassCard>
-  )
+    improvements.push({
+      title: 'Portfolio weiter aufbauen',
+      description:
+        'Mit mehr investiertem Kapital werden Portfolio-Signale aussagekräftiger und langfristige Analysen sinnvoller.',
+      impact: projectedScore - current.score,
+      currentScore: current.score,
+      projectedScore,
+      priority: 'low',
+    })
+  }
+
+  return improvements
+    .filter((item) => item.impact > 0)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, 3)
 }
