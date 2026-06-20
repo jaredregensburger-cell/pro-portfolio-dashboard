@@ -136,6 +136,124 @@ export function ImportPortfolioShell() {
     return row.type === 'buy' ? sum + value : sum - value
   }, 0)
 
+  function toDbAssetClass(assetClass: string) {
+  if (assetClass === 'stock') return 'equity'
+  if (assetClass === 'metal') return 'commodity'
+  return assetClass
+}
+
+async function getOrCreateDefaultPortfolio(userId: string) {
+  const supabase = createSupabaseBrowserClient()
+
+  const { data: existing, error: existingError } = await supabase
+    .from('portfolios')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .maybeSingle()
+
+  if (existingError) throw existingError
+  if (existing) return existing
+
+  const { data: created, error: createError } = await supabase
+    .from('portfolios')
+    .insert({
+      user_id: userId,
+      name: 'Mein Portfolio',
+      description: 'Imported portfolio',
+      currency: 'EUR',
+      is_default: true,
+    })
+    .select('*')
+    .single()
+
+  if (createError) throw createError
+  return created
+}
+
+async function handleImport() {
+  setError(null)
+
+  try {
+    const supabase = createSupabaseBrowserClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      setError('Du musst eingeloggt sein.')
+      return
+    }
+
+    const portfolio = await getOrCreateDefaultPortfolio(user.id)
+
+    for (const row of rows) {
+      const ticker = row.ticker.toUpperCase()
+
+      const { data: existingAsset, error: existingError } = await supabase
+        .from('assets')
+        .select('*')
+        .eq('portfolio_id', portfolio.id)
+        .eq('ticker', ticker)
+        .maybeSingle()
+
+      if (existingError) throw existingError
+
+      let asset = existingAsset
+
+      if (!asset) {
+        const { data: createdAsset, error: assetError } = await supabase
+          .from('assets')
+          .insert({
+            portfolio_id: portfolio.id,
+            ticker,
+            name: row.name,
+            asset_class: toDbAssetClass(row.asset_class),
+            current_price: row.price,
+            currency: 'EUR',
+          })
+          .select('*')
+          .single()
+
+        if (assetError) throw assetError
+        asset = createdAsset
+      }
+
+      const { error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          portfolio_id: portfolio.id,
+          asset_id: asset.id,
+          type: row.type,
+          status: 'completed',
+          quantity: row.quantity,
+          price: row.price,
+          total_amount: row.quantity * row.price,
+          fee: 0,
+          currency: 'EUR',
+          note: 'CSV Import',
+          executed_at: new Date(row.date).toISOString(),
+        })
+
+      if (txError) throw txError
+    }
+
+    showSuccessToast(
+      'Import abgeschlossen',
+      `${rows.length} Transaktionen wurden importiert.`
+    )
+
+    window.dispatchEvent(new Event('folio:portfolio-changed'))
+
+    setFile(null)
+    setRows([])
+  } catch (err) {
+    console.error('CSV import error:', err)
+    setError(err instanceof Error ? err.message : 'Import fehlgeschlagen.')
+  }
+}
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <GlassCard className="text-center py-16">
@@ -253,9 +371,9 @@ export function ImportPortfolioShell() {
           )}
 
           <div className="mt-5 flex justify-end">
-            <Button disabled>
-              Importieren kommt im nächsten Schritt
-            </Button>
+            <Button onClick={handleImport}>
+  In Portfolio importieren
+</Button>
           </div>
         </GlassCard>
       )}
