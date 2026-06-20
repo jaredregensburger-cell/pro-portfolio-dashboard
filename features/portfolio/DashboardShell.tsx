@@ -49,16 +49,51 @@ export function DashboardShell() {
   }
 
   if (assets.length === 0) {
-    return (
-      <EmptyState
-        icon={Wallet}
-        title="Dein Portfolio ist leer"
-        description="Lege dein erstes Asset an. Bestand, Durchschnittspreis und P&L werden aus deinen Transaktionen berechnet."
-        action={{ label: 'Asset hinzufügen', onClick: () => openModal('add-asset') }}
-        className="min-h-[420px]"
-      />
-    )
-  }
+  return (
+    <GlassCard className="max-w-3xl mx-auto text-center py-16">
+      <div className="space-y-6">
+        <div>
+          <p className="text-signal font-semibold mb-2">
+            Willkommen bei Folio AI
+          </p>
+
+          <h1 className="text-3xl font-bold text-ink">
+            In 60 Sekunden zu deinem fertigen Portfolio
+          </h1>
+
+          <p className="mt-4 text-ink-muted max-w-xl mx-auto">
+            Verbinde deinen Broker oder importiere dein Portfolio.
+            Folio analysiert automatisch deine Positionen,
+            Risiken und Chancen.
+          </p>
+        </div>
+
+        <div className="grid gap-3 max-w-lg mx-auto text-left">
+          <div className="rounded-xl border border-border p-4">
+            1. Broker auswählen
+          </div>
+
+          <div className="rounded-xl border border-border p-4">
+            2. CSV hochladen
+          </div>
+
+          <div className="rounded-xl border border-border p-4">
+            3. Portfolio Analyse erhalten
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => window.location.href = '/import'}
+            className="px-5 py-3 rounded-xl bg-signal text-white font-medium"
+          >
+            Portfolio importieren
+          </button>
+        </div>
+      </div>
+    </GlassCard>
+  )
+}
 
   const analytics = getPortfolioAnalytics(assets, transactions, livePrices)
 
