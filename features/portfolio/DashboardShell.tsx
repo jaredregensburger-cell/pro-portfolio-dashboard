@@ -1,5 +1,7 @@
 'use client'
 
+import { getPortfolioImprovements } from '@/features/portfolio/portfolioOptimizer'
+import { PortfolioOptimizer } from '@/features/portfolio/PortfolioOptimizer'
 import { PortfolioInsights } from '@/features/portfolio/PortfolioInsights'
 import { calculatePortfolioScore } from '@/features/portfolio/portfolioScore'
 import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, SkeletonTable } from '@/components/ui'
