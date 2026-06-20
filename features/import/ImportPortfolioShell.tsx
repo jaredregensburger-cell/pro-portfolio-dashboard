@@ -7,20 +7,8 @@ import { GlassCard, Button } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { showSuccessToast } from '@/store/toast.store'
-
-type ImportRow = {
-  ticker: string
-  name: string
-  asset_class: string
-  type: 'buy' | 'sell'
-  quantity: number
-  price: number
-  date: string
-  source_id?: string
-  source?: 'folio' | 'trade_republic'
-}
-
-const FOLIO_COLUMNS = ['ticker', 'name', 'asset_class', 'type', 'quantity', 'price', 'date']
+import { IMPORT_PARSERS } from '@/features/import/parsers'
+import type { ImportRow, ImportParser } from '@/features/import/parsers/types'
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []
@@ -52,7 +40,9 @@ function parseCsv(text: string): string[][] {
     if ((char === '\n' || char === '\r') && !inQuotes) {
       if (char === '\r' && next === '\n') i++
       row.push(cell.trim())
+
       if (row.some((v) => v.length > 0)) rows.push(row)
+
       row = []
       cell = ''
       continue
@@ -62,33 +52,10 @@ function parseCsv(text: string): string[][] {
   }
 
   row.push(cell.trim())
+
   if (row.some((v) => v.length > 0)) rows.push(row)
 
   return rows
-}
-
-function normalizeAssetClass(value: string) {
-  const v = value.toLowerCase().trim()
-
-  if (v === 'stock' || v === 'equity') return 'stock'
-  if (v === 'crypto') return 'crypto'
-  if (v === 'etf') return 'etf'
-  if (v === 'metal' || v === 'commodity') return 'metal'
-  if (v === 'cash') return 'cash'
-
-  return ''
-}
-
-function normalizeTradeRepublicAssetClass(value: string) {
-  const v = value.toLowerCase().trim()
-
-  if (v === 'stock') return 'stock'
-  if (v === 'crypto') return 'crypto'
-  if (v === 'etf') return 'etf'
-  if (v === 'derivative') return 'stock'
-  if (v === 'fund') return 'etf'
-
-  return 'stock'
 }
 
 function toDbAssetClass(assetClass: string) {
@@ -97,111 +64,13 @@ function toDbAssetClass(assetClass: string) {
   return assetClass
 }
 
-function detectFormat(headers: string[]) {
-  const isFolio = FOLIO_COLUMNS.every((col) => headers.includes(col))
-
-  if (isFolio) return 'folio'
-
-  const isTradeRepublic =
-    headers.includes('transaction_id') &&
-    headers.includes('category') &&
-    headers.includes('type') &&
-    headers.includes('symbol') &&
-    headers.includes('shares') &&
-    headers.includes('price') &&
-    headers.includes('date')
-
-  if (isTradeRepublic) return 'trade_republic'
-
-  return 'unknown'
-}
-
-function mapFolioRows(parsed: string[][], headers: string[]): ImportRow[] {
-  return parsed.slice(1).map((cells, index) => {
-    const get = (key: string) => cells[headers.indexOf(key)] ?? ''
-
-    const ticker = get('ticker').toUpperCase().trim()
-    const name = get('name').trim()
-    const assetClass = normalizeAssetClass(get('asset_class'))
-    const type = get('type').toLowerCase().trim()
-    const quantity = Number(get('quantity'))
-    const price = Number(get('price'))
-    const date = get('date').trim()
-
-    if (!ticker) throw new Error(`Zeile ${index + 2}: ticker fehlt.`)
-    if (!name) throw new Error(`Zeile ${index + 2}: name fehlt.`)
-    if (!assetClass) throw new Error(`Zeile ${index + 2}: asset_class ist ungültig.`)
-    if (type !== 'buy' && type !== 'sell') throw new Error(`Zeile ${index + 2}: type muss buy oder sell sein.`)
-    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error(`Zeile ${index + 2}: quantity ist ungültig.`)
-    if (!Number.isFinite(price) || price <= 0) throw new Error(`Zeile ${index + 2}: price ist ungültig.`)
-    if (!date) throw new Error(`Zeile ${index + 2}: date fehlt.`)
-
-    return {
-      ticker,
-      name,
-      asset_class: assetClass,
-      type: type as 'buy' | 'sell',
-      quantity,
-      price,
-      date,
-      source: 'folio',
-    }
-  })
-}
-
-function mapTradeRepublicRows(parsed: string[][], headers: string[]): ImportRow[] {
-  const rows: ImportRow[] = []
-
-  parsed.slice(1).forEach((cells, index) => {
-    const get = (key: string) => cells[headers.indexOf(key)] ?? ''
-
-    const category = get('category').toUpperCase().trim()
-    const rawType = get('type').toUpperCase().trim()
-
-    if (category !== 'TRADING') return
-    if (rawType !== 'BUY' && rawType !== 'SELL') return
-
-    const symbol = get('symbol').toUpperCase().trim()
-    const name = get('name').trim()
-    const assetClass = normalizeTradeRepublicAssetClass(get('asset_class'))
-    const quantity = Number(get('shares'))
-    const price = Number(get('price'))
-    const date = get('datetime').trim() || get('date').trim()
-    const sourceId = get('transaction_id').trim()
-
-    if (!symbol) throw new Error(`Zeile ${index + 2}: symbol fehlt.`)
-    if (!name) throw new Error(`Zeile ${index + 2}: name fehlt.`)
-    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error(`Zeile ${index + 2}: shares ist ungültig.`)
-    if (!Number.isFinite(price) || price <= 0) throw new Error(`Zeile ${index + 2}: price ist ungültig.`)
-    if (!date) throw new Error(`Zeile ${index + 2}: date fehlt.`)
-
-    rows.push({
-      ticker: symbol,
-      name,
-      asset_class: assetClass,
-      type: rawType === 'BUY' ? 'buy' : 'sell',
-      quantity,
-      price,
-      date,
-      source_id: sourceId || undefined,
-      source: 'trade_republic',
-    })
-  })
-
-  if (rows.length === 0) {
-    throw new Error('Keine Trade-Republic-Kauf- oder Verkaufstransaktionen gefunden.')
-  }
-
-  return rows
-}
-
 export function ImportPortfolioShell() {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<ImportRow[]>([])
-  const [format, setFormat] = useState<'folio' | 'trade_republic' | null>(null)
+  const [parser, setParser] = useState<ImportParser | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState('')
@@ -210,7 +79,7 @@ export function ImportPortfolioShell() {
     setError(null)
     setRows([])
     setProgress('')
-    setFormat(null)
+    setParser(null)
 
     if (!selectedFile) return
 
@@ -236,19 +105,24 @@ export function ImportPortfolioShell() {
       }
 
       const headers = parsed[0].map((h) => h.toLowerCase().trim())
-      const detected = detectFormat(headers)
 
-      if (detected === 'unknown') {
-        setError('CSV-Format nicht erkannt. Unterstützt werden Folio Standard CSV und Trade Republic CSV.')
+      const matchedParser = IMPORT_PARSERS.find((p) => p.canParse(headers))
+
+      if (!matchedParser) {
+        setError(
+          'CSV-Format nicht erkannt. Unterstützt werden aktuell Folio Standard CSV und Trade Republic CSV.'
+        )
         return
       }
 
-      const mappedRows =
-        detected === 'trade_republic'
-          ? mapTradeRepublicRows(parsed, headers)
-          : mapFolioRows(parsed, headers)
+      const mappedRows = matchedParser.parse(parsed, headers)
 
-      setFormat(detected)
+      if (mappedRows.length === 0) {
+        setError('Keine importierbaren Transaktionen gefunden.')
+        return
+      }
+
+      setParser(matchedParser)
       setRows(mappedRows)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'CSV konnte nicht gelesen werden.')
@@ -390,6 +264,7 @@ export function ImportPortfolioShell() {
         })
 
         if (txError) throw txError
+
         imported++
       }
 
@@ -403,7 +278,7 @@ export function ImportPortfolioShell() {
       setFile(null)
       setRows([])
       setProgress('')
-      setFormat(null)
+      setParser(null)
 
       router.push('/dashboard')
       router.refresh()
@@ -425,10 +300,12 @@ export function ImportPortfolioShell() {
       <GlassCard className="text-center py-16">
         <Upload className="mx-auto mb-4 h-10 w-10 text-signal" />
 
-        <h2 className="text-xl font-semibold mb-2">Portfolio importieren</h2>
+        <h2 className="text-xl font-semibold mb-2">
+          Portfolio importieren
+        </h2>
 
         <p className="text-ink-muted mb-6">
-          Lade eine Folio Standard CSV oder einen Trade Republic CSV-Export hoch.
+          Lade eine CSV-Datei hoch. Folio erkennt unterstützte Broker automatisch.
         </p>
 
         <input
@@ -459,10 +336,12 @@ export function ImportPortfolioShell() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-ink">{file.name}</p>
+              <p className="truncate font-semibold text-ink">
+                {file.name}
+              </p>
               <p className="text-data-sm text-ink-muted">
-                {format === 'trade_republic' ? 'Trade Republic CSV erkannt' : 'Folio CSV erkannt'} ·{' '}
-                {rows.length} Transaktionen · Gesamtwert ca. {formatCurrency(totalValue, 'EUR')}
+                {parser?.name ?? 'CSV'} erkannt · {rows.length} Transaktionen · Gesamtwert ca.{' '}
+                {formatCurrency(totalValue, 'EUR')}
               </p>
             </div>
 
@@ -473,7 +352,7 @@ export function ImportPortfolioShell() {
                 setFile(null)
                 setRows([])
                 setError(null)
-                setFormat(null)
+                setParser(null)
               }}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-lg',
@@ -512,17 +391,27 @@ export function ImportPortfolioShell() {
               <tbody className="divide-y divide-border">
                 {rows.slice(0, 20).map((row, index) => (
                   <tr key={`${row.ticker}-${index}`} className="text-ink">
-                    <td className="px-4 py-3 font-mono font-semibold">{row.ticker}</td>
-                    <td className="px-4 py-3">{row.name}</td>
-                    <td className="px-4 py-3">{row.asset_class}</td>
-                    <td className="px-4 py-3">{row.type}</td>
+                    <td className="px-4 py-3 font-mono font-semibold">
+                      {row.ticker}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.asset_class}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.type}
+                    </td>
                     <td className="px-4 py-3 text-right font-mono">
                       {formatNumber(row.quantity, row.asset_class === 'crypto' ? 8 : 4)}
                     </td>
                     <td className="px-4 py-3 text-right font-mono">
                       {formatCurrency(row.price, 'EUR')}
                     </td>
-                    <td className="px-4 py-3 font-mono text-ink-muted">{row.date.slice(0, 10)}</td>
+                    <td className="px-4 py-3 font-mono text-ink-muted">
+                      {row.date.slice(0, 10)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
