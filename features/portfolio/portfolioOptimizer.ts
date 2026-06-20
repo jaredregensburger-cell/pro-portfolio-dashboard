@@ -1,6 +1,5 @@
 'use client'
 
-import { GlassCard } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { PortfolioImprovement } from './portfolioOptimizer'
 import { Sparkles, ArrowUpRight } from 'lucide-react'
