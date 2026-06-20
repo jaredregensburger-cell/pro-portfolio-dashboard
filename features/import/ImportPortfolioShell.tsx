@@ -304,9 +304,42 @@ export function ImportPortfolioShell() {
           Portfolio importieren
         </h2>
 
-        <p className="text-ink-muted mb-6">
-          Lade eine CSV-Datei hoch. Folio erkennt unterstützte Broker automatisch.
-        </p>
+        <p className="text-ink-muted mb-4">
+  Lade eine CSV-Datei hoch. Folio erkennt unterstützte Broker automatisch.
+</p>
+
+<div className="mx-auto max-w-md rounded-xl border border-border bg-surface-raised p-4 text-left">
+  <p className="mb-3 text-data-sm font-semibold text-ink">
+    Unterstützte Broker
+  </p>
+
+  <div className="space-y-2 text-data-sm">
+    <div className="flex items-center justify-between">
+      <span>✅ Trade Republic</span>
+      <span className="text-gain">Verfügbar</span>
+    </div>
+
+    <div className="flex items-center justify-between">
+      <span>✅ Kraken</span>
+      <span className="text-gain">Verfügbar</span>
+    </div>
+
+    <div className="flex items-center justify-between">
+      <span>🟡 Binance</span>
+      <span className="text-ink-faint">Demnächst</span>
+    </div>
+
+    <div className="flex items-center justify-between">
+      <span>🟡 Coinbase</span>
+      <span className="text-ink-faint">Demnächst</span>
+    </div>
+
+    <div className="flex items-center justify-between">
+      <span>🟡 Scalable Capital</span>
+      <span className="text-ink-faint">Demnächst</span>
+    </div>
+  </div>
+</div>
 
         <input
           ref={inputRef}
