@@ -4,6 +4,7 @@ import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, Skele
 import { PortfolioValueChart } from '@/components/charts'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
 import { useLiveMarketDataContext } from '@/features/portfolio/LiveMarketDataProvider'
+import { usePortfolioSnapshots } from '@/features/portfolio/usePortfolioSnapshots'
 import { usePortfolioStore, useModalStore, useUIStore } from '@/store'
 import {
   getPortfolioAnalytics,
@@ -25,13 +26,15 @@ import {
 } from 'lucide-react'
 
 export function DashboardShell() {
-  const { assets, transactions, hasHydrated } = useActivePortfolioData()
+  const { portfolioId, assets, transactions, hasHydrated } = useActivePortfolioData()
   const { livePrices } = useLiveMarketDataContext()
+  const { points: snapshotPoints, loading: snapshotsLoading } = usePortfolioSnapshots(portfolioId)
+
   const { selectedTimeRange, setTimeRange } = usePortfolioStore()
   const currency = useUIStore((s) => s.currency)
   const openModal = useModalStore((s) => s.openModal)
 
-  if (!hasHydrated) {
+  if (!hasHydrated || snapshotsLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -63,7 +66,28 @@ export function DashboardShell() {
     .sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime())
     .slice(0, 5)
 
-  const valueHistory = getPortfolioValueHistory(assets, transactions)
+  const fallbackHistory = getPortfolioValueHistory(assets, transactions)
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const currentPoint = {
+    date: today,
+    totalValue: analytics.totalValue,
+    totalCost: analytics.totalCost,
+    gain: analytics.totalValue - analytics.totalCost,
+    gainPct:
+      analytics.totalCost > 0
+        ? ((analytics.totalValue - analytics.totalCost) / analytics.totalCost) * 100
+        : 0,
+  }
+
+  const baseHistory = snapshotPoints.length > 0 ? snapshotPoints : fallbackHistory
+
+  const valueHistory =
+    baseHistory.length > 0 && baseHistory[baseHistory.length - 1]?.date === today
+      ? [...baseHistory.slice(0, -1), currentPoint]
+      : [...baseHistory, currentPoint]
+
   const filteredHistory = filterValueHistoryByRange(valueHistory, selectedTimeRange)
 
   const rangeChange =
@@ -94,12 +118,7 @@ export function DashboardShell() {
           <p className="text-data-sm text-ink-muted font-medium tracking-wide uppercase">
             Total Profit
           </p>
-          <p
-            className={cn(
-              'font-mono text-data-3xl font-semibold tracking-tight',
-              gainColor(analytics.totalProfit)
-            )}
-          >
+          <p className={cn('font-mono text-data-3xl font-semibold tracking-tight', gainColor(analytics.totalProfit))}>
             {analytics.totalProfit >= 0 ? '+' : ''}
             {formatCurrency(analytics.totalProfit, currency)}
           </p>
@@ -207,12 +226,7 @@ export function DashboardShell() {
                         </p>
                       </div>
 
-                      <p
-                        className={cn(
-                          'font-mono text-data-sm font-medium',
-                          isBuy ? 'text-ink' : 'text-gain'
-                        )}
-                      >
+                      <p className={cn('font-mono text-data-sm font-medium', isBuy ? 'text-ink' : 'text-gain')}>
                         {isBuy ? '-' : '+'}
                         {formatCurrency(total, currency)}
                       </p>
