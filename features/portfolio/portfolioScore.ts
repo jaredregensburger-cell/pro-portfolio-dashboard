@@ -25,6 +25,7 @@ export function calculatePortfolioScore(
 ): PortfolioScoreResult {
   const openPositions = positions.filter((p) => p.position.hasPosition)
   const insights: PortfolioScoreInsight[] = []
+  const recommendations: PortfolioRecommendation[] = []
 
   let score = 100
 
