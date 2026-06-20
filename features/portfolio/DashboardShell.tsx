@@ -1,5 +1,6 @@
 'use client'
 
+import { PortfolioInsights } from '@/features/portfolio/PortfolioInsights'
 import { calculatePortfolioScore } from '@/features/portfolio/portfolioScore'
 import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, SkeletonTable } from '@/components/ui'
 import { PortfolioValueChart } from '@/components/charts'
@@ -222,6 +223,8 @@ export function DashboardShell() {
           <PortfolioValueChart data={filteredHistory} />
         </div>
       </GlassCard>
+
+      <PortfolioInsights score={portfolioScore} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
