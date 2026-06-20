@@ -13,6 +13,7 @@ import {
   Zap,
   BarChart3,
   Star,
+  UploadCloud,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
