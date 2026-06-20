@@ -6,10 +6,17 @@ export type PortfolioScoreInsight = {
   message: string
 }
 
+export type PortfolioRecommendation = {
+  title: string
+  priority: 'high' | 'medium' | 'low'
+  message: string
+}
+
 export type PortfolioScoreResult = {
   score: number
   label: string
   insights: PortfolioScoreInsight[]
+  recommendations: PortfolioRecommendation[]
 }
 
 export function calculatePortfolioScore(
