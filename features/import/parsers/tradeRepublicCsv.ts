@@ -1,5 +1,5 @@
 import type { ImportParser, ImportRow } from './types'
-import { resolveIsinToTicker } from './isinResolver'
+import { resolveIsinToTicker } from '@/lib/market/isinMap'
 
 function normalizeAssetClass(value: string) {
   const v = value.toLowerCase().trim()
