@@ -27,6 +27,24 @@ export function calculatePortfolioScore(
   const insights: PortfolioScoreInsight[] = []
   const recommendations: PortfolioRecommendation[] = []
 
+  recommendations.push({
+  title: 'Krypto-Risiko senken',
+  priority: 'high',
+  message: 'Dein Portfolio ist stark von Krypto abhängig. Ein ETF- oder Cash-Anteil könnte die Schwankungen reduzieren.',
+})
+
+  recommendations.push({
+  title: 'Breitere Basis aufbauen',
+  priority: 'medium',
+  message: 'Ein breit gestreuter ETF kann helfen, dein Portfolio stabiler und weniger abhängig von Einzelpositionen zu machen.',
+})
+
+  recommendations.push({
+  title: 'Klumpenrisiko reduzieren',
+  priority: 'high',
+  message: 'Eine einzelne Position dominiert dein Portfolio. Prüfe, ob du neue Käufe stärker auf andere Assets verteilst.',
+})
+
   let score = 100
 
   if (totalValue < 100) {
@@ -197,15 +215,15 @@ export function calculatePortfolioScore(
   const finalScore = Math.max(0, Math.min(100, Math.round(score)))
 
   return {
-    score: finalScore,
-    label:
-      finalScore >= 80
-        ? 'Stark'
-        : finalScore >= 60
-          ? 'Solide'
-          : finalScore >= 40
-            ? 'Ausbaufähig'
-            : 'Riskant',
-    insights,
-  }
+  score: finalScore,
+  label:
+    finalScore >= 80
+      ? 'Stark'
+      : finalScore >= 60
+        ? 'Solide'
+        : finalScore >= 40
+          ? 'Ausbaufähig'
+          : 'Riskant',
+  insights,
+  recommendations,
 }
