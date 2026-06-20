@@ -15,7 +15,7 @@ import {
   getPortfolioValueHistory,
   filterValueHistoryByRange,
 } from '@/features/portfolio/logic'
-import { AssetRow } from '@/features/assets/AssetRow'
+import { AssetRow } from '@/features/assets/AssetRow' 
 import { cn, formatCurrency, formatPercent, formatRelativeTime, gainColor } from '@/lib/utils'
 import { ASSET_CLASS_META } from '@/lib/constants'
 import type { RankedPosition } from '@/features/portfolio/logic'
