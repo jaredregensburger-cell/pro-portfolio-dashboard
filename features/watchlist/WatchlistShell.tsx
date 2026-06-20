@@ -10,7 +10,7 @@ import { WatchlistRow } from './WatchlistRow'
 import { Star, Plus } from 'lucide-react'
 import type { AssetClass } from '@/types'
 
-type WatchlistItem = {
+type DbWatchlistItem = {
   id: string
   user_id: string
   ticker: string
@@ -30,26 +30,18 @@ function mapAssetClass(value: string): AssetClass {
 }
 
 export function WatchlistShell() {
-  const [items, setItems] = useState<WatchlistItem[]>([])
+  const [items, setItems] = useState<DbWatchlistItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const openModal = useModalStore((s) => s.openModal)
   const currency = useUIStore((s) => s.currency)
 
-  const mappedItems = items.map((item) => ({
-    id: item.id,
+  const liveTargets = items.map((item) => ({
     ticker: item.ticker,
-    name: item.name,
     assetClass: mapAssetClass(item.asset_class),
   }))
 
-  const { livePrices, staleTickers } = useLiveMarketData(
-    mappedItems.map((i) => ({
-      ticker: i.ticker,
-      assetClass: i.assetClass,
-    })),
-    currency
-  )
+  const { livePrices, staleTickers } = useLiveMarketData(liveTargets, currency)
 
   const loadWatchlist = useCallback(async () => {
     setLoading(true)
@@ -74,7 +66,7 @@ export function WatchlistShell() {
 
       if (error) throw error
 
-      setItems((data ?? []) as WatchlistItem[])
+      setItems((data ?? []) as DbWatchlistItem[])
     } catch (err) {
       console.error('Watchlist load error:', err)
       setItems([])
@@ -120,7 +112,7 @@ export function WatchlistShell() {
     }
   }
 
-  function handleBuy(item: WatchlistItem) {
+  function handleBuy(item: DbWatchlistItem) {
     openModal('add-asset', {
       ticker: item.ticker,
       name: item.name,
@@ -168,12 +160,11 @@ export function WatchlistShell() {
               <WatchlistRow
                 key={item.id}
                 item={{
-  id: item.id,
-  ticker: item.ticker,
-  name: item.name,
-  assetClass,
-  addedAt: item.created_at,
-}}
+                  id: item.id,
+                  ticker: item.ticker,
+                  name: item.name,
+                  assetClass,
+                  addedAt: item.created_at,
                 }}
                 livePrice={livePrices.get(item.ticker)}
                 isStale={staleTickers.has(item.ticker)}
