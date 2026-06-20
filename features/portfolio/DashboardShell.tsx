@@ -97,6 +97,10 @@ export function DashboardShell() {
 }
 
   const analytics = getPortfolioAnalytics(assets, transactions, livePrices)
+  const portfolioScore = calculatePortfolioScore(
+  analytics.positions,
+  analytics.totalValue
+)
 
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime())
