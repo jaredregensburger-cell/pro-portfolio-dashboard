@@ -38,6 +38,8 @@ export const tradeRepublicParser: ImportParser = {
       if (category !== 'TRADING') return
       if (type !== 'BUY' && type !== 'SELL') return
 
+      const symbol = get('symbol').trim().toUpperCase()
+      
       result.push({
         ticker: resolveIsinToTicker(symbol),
         name: get('name').trim(),
