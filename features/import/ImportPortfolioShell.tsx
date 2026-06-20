@@ -1,11 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { showSuccessToast } from '@/store/toast.store'
-import { Upload, FileText, X, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Upload, FileText, X, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 import { GlassCard, Button } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { showSuccessToast } from '@/store/toast.store'
 
 type ImportRow = {
   ticker: string
@@ -17,55 +18,49 @@ type ImportRow = {
   date: string
 }
 
-const REQUIRED_COLUMNS = [
-  'ticker',
-  'name',
-  'asset_class',
-  'type',
-  'quantity',
-  'price',
-  'date',
-]
+const REQUIRED_COLUMNS = ['ticker', 'name', 'asset_class', 'type', 'quantity', 'price', 'date']
 
 function parseCsv(text: string): string[][] {
   return text
     .trim()
     .split(/\r?\n/)
-    .map((line) =>
-      line
-        .split(',')
-        .map((cell) => cell.trim().replace(/^"|"$/g, ''))
-    )
+    .map((line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, '')))
 }
 
 function normalizeAssetClass(value: string) {
   const v = value.toLowerCase().trim()
-
   if (v === 'stock' || v === 'equity') return 'stock'
   if (v === 'crypto') return 'crypto'
   if (v === 'etf') return 'etf'
   if (v === 'metal' || v === 'commodity') return 'metal'
   if (v === 'cash') return 'cash'
-
   return ''
 }
 
+function toDbAssetClass(assetClass: string) {
+  if (assetClass === 'stock') return 'equity'
+  if (assetClass === 'metal') return 'commodity'
+  return assetClass
+}
+
 export function ImportPortfolioShell() {
+  const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<ImportRow[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState('')
 
   async function handleFile(selectedFile: File | null) {
     setError(null)
     setRows([])
+    setProgress('')
 
     if (!selectedFile) return
 
-    const lowerName = selectedFile.name.toLowerCase()
-
-    if (!lowerName.endsWith('.csv')) {
+    if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
       setError('Version 1 unterstützt nur CSV-Dateien.')
       return
     }
@@ -87,7 +82,6 @@ export function ImportPortfolioShell() {
       }
 
       const headers = parsed[0].map((h) => h.toLowerCase().trim())
-
       const missing = REQUIRED_COLUMNS.filter((col) => !headers.includes(col))
 
       if (missing.length > 0) {
@@ -114,15 +108,7 @@ export function ImportPortfolioShell() {
         if (!Number.isFinite(price) || price <= 0) throw new Error(`Zeile ${index + 2}: price ist ungültig.`)
         if (!date) throw new Error(`Zeile ${index + 2}: date fehlt.`)
 
-        return {
-          ticker,
-          name,
-          asset_class: assetClass,
-          type,
-          quantity,
-          price,
-          date,
-        }
+        return { ticker, name, asset_class: assetClass, type, quantity, price, date }
       })
 
       setRows(mappedRows)
@@ -131,98 +117,112 @@ export function ImportPortfolioShell() {
     }
   }
 
-  const totalValue = rows.reduce((sum, row) => {
-    const value = row.quantity * row.price
-    return row.type === 'buy' ? sum + value : sum - value
-  }, 0)
-
-  function toDbAssetClass(assetClass: string) {
-  if (assetClass === 'stock') return 'equity'
-  if (assetClass === 'metal') return 'commodity'
-  return assetClass
-}
-
-async function getOrCreateDefaultPortfolio(userId: string) {
-  const supabase = createSupabaseBrowserClient()
-
-  const { data: existing, error: existingError } = await supabase
-    .from('portfolios')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_default', true)
-    .maybeSingle()
-
-  if (existingError) throw existingError
-  if (existing) return existing
-
-  const { data: created, error: createError } = await supabase
-    .from('portfolios')
-    .insert({
-      user_id: userId,
-      name: 'Mein Portfolio',
-      description: 'Imported portfolio',
-      currency: 'EUR',
-      is_default: true,
-    })
-    .select('*')
-    .single()
-
-  if (createError) throw createError
-  return created
-}
-
-async function handleImport() {
-  setError(null)
-
-  try {
+  async function getOrCreateDefaultPortfolio(userId: string) {
     const supabase = createSupabaseBrowserClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: existing, error: existingError } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle()
 
-    if (!user) {
-      setError('Du musst eingeloggt sein.')
-      return
-    }
+    if (existingError) throw existingError
+    if (existing) return existing
 
-    const portfolio = await getOrCreateDefaultPortfolio(user.id)
+    const { data: created, error: createError } = await supabase
+      .from('portfolios')
+      .insert({
+        user_id: userId,
+        name: 'Mein Portfolio',
+        description: 'Imported portfolio',
+        currency: 'EUR',
+        is_default: true,
+      })
+      .select('*')
+      .single()
 
-    for (const row of rows) {
-      const ticker = row.ticker.toUpperCase()
+    if (createError) throw createError
+    return created
+  }
 
-      const { data: existingAsset, error: existingError } = await supabase
-        .from('assets')
-        .select('*')
-        .eq('portfolio_id', portfolio.id)
-        .eq('ticker', ticker)
-        .maybeSingle()
+  async function handleImport() {
+    setError(null)
+    setImporting(true)
+    setProgress('Import wird vorbereitet…')
 
-      if (existingError) throw existingError
+    try {
+      const supabase = createSupabaseBrowserClient()
 
-      let asset = existingAsset
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      if (!asset) {
-        const { data: createdAsset, error: assetError } = await supabase
-          .from('assets')
-          .insert({
-            portfolio_id: portfolio.id,
-            ticker,
-            name: row.name,
-            asset_class: toDbAssetClass(row.asset_class),
-            current_price: row.price,
-            currency: 'EUR',
-          })
-          .select('*')
-          .single()
-
-        if (assetError) throw assetError
-        asset = createdAsset
+      if (!user) {
+        setError('Du musst eingeloggt sein.')
+        return
       }
 
-      const { error: txError } = await supabase
-        .from('transactions')
-        .insert({
+      const portfolio = await getOrCreateDefaultPortfolio(user.id)
+
+      let imported = 0
+      let skipped = 0
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        setProgress(`Importiere ${i + 1}/${rows.length} Transaktionen…`)
+
+        const ticker = row.ticker.toUpperCase()
+        const executedAt = new Date(row.date).toISOString()
+
+        const { data: existingAsset, error: existingError } = await supabase
+          .from('assets')
+          .select('*')
+          .eq('portfolio_id', portfolio.id)
+          .eq('ticker', ticker)
+          .maybeSingle()
+
+        if (existingError) throw existingError
+
+        let asset = existingAsset
+
+        if (!asset) {
+          const { data: createdAsset, error: assetError } = await supabase
+            .from('assets')
+            .insert({
+              portfolio_id: portfolio.id,
+              ticker,
+              name: row.name,
+              asset_class: toDbAssetClass(row.asset_class),
+              current_price: row.price,
+              currency: 'EUR',
+            })
+            .select('*')
+            .single()
+
+          if (assetError) throw assetError
+          asset = createdAsset
+        }
+
+        const { data: existingTx, error: duplicateError } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('portfolio_id', portfolio.id)
+          .eq('asset_id', asset.id)
+          .eq('type', row.type)
+          .eq('quantity', row.quantity)
+          .eq('price', row.price)
+          .eq('executed_at', executedAt)
+          .maybeSingle()
+
+        if (duplicateError) throw duplicateError
+
+        if (existingTx) {
+          skipped++
+          continue
+        }
+
+        const { error: txError } = await supabase.from('transactions').insert({
           portfolio_id: portfolio.id,
           asset_id: asset.id,
           type: row.type,
@@ -233,35 +233,45 @@ async function handleImport() {
           fee: 0,
           currency: 'EUR',
           note: 'CSV Import',
-          executed_at: new Date(row.date).toISOString(),
+          executed_at: executedAt,
         })
 
-      if (txError) throw txError
+        if (txError) throw txError
+        imported++
+      }
+
+      showSuccessToast(
+        'Import abgeschlossen',
+        `${imported} importiert · ${skipped} Duplikate übersprungen.`
+      )
+
+      window.dispatchEvent(new Event('folio:portfolio-changed'))
+
+      setFile(null)
+      setRows([])
+      setProgress('')
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err) {
+      console.error('CSV import error:', err)
+      setError(err instanceof Error ? err.message : 'Import fehlgeschlagen.')
+    } finally {
+      setImporting(false)
     }
-
-    showSuccessToast(
-      'Import abgeschlossen',
-      `${rows.length} Transaktionen wurden importiert.`
-    )
-
-    window.dispatchEvent(new Event('folio:portfolio-changed'))
-
-    setFile(null)
-    setRows([])
-  } catch (err) {
-    console.error('CSV import error:', err)
-    setError(err instanceof Error ? err.message : 'Import fehlgeschlagen.')
   }
-}
+
+  const totalValue = rows.reduce((sum, row) => {
+    const value = row.quantity * row.price
+    return row.type === 'buy' ? sum + value : sum - value
+  }, 0)
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <GlassCard className="text-center py-16">
         <Upload className="mx-auto mb-4 h-10 w-10 text-signal" />
 
-        <h2 className="text-xl font-semibold mb-2">
-          Portfolio importieren
-        </h2>
+        <h2 className="text-xl font-semibold mb-2">Portfolio importieren</h2>
 
         <p className="text-ink-muted mb-6">
           Lade eine CSV-Datei mit ticker, name, asset_class, type, quantity, price und date hoch.
@@ -275,7 +285,7 @@ async function handleImport() {
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
 
-        <Button onClick={() => inputRef.current?.click()}>
+        <Button onClick={() => inputRef.current?.click()} disabled={importing}>
           CSV auswählen
         </Button>
 
@@ -295,9 +305,7 @@ async function handleImport() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-ink">
-                {file.name}
-              </p>
+              <p className="truncate font-semibold text-ink">{file.name}</p>
               <p className="text-data-sm text-ink-muted">
                 {rows.length} Transaktionen erkannt · Gesamtwert ca. {formatCurrency(totalValue, 'EUR')}
               </p>
@@ -305,6 +313,7 @@ async function handleImport() {
 
             <button
               type="button"
+              disabled={importing}
               onClick={() => {
                 setFile(null)
                 setRows([])
@@ -312,7 +321,7 @@ async function handleImport() {
               }}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-lg',
-                'text-ink-muted hover:bg-surface-raised hover:text-ink'
+                'text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50'
               )}
             >
               <X size={16} />
@@ -326,7 +335,7 @@ async function handleImport() {
             </div>
 
             <p className="mt-2 text-data-sm text-ink-muted">
-              Prüfe die Vorschau. Im nächsten Schritt importieren wir diese Daten direkt nach Supabase.
+              Duplikate werden beim Import automatisch übersprungen.
             </p>
           </div>
 
@@ -370,10 +379,17 @@ async function handleImport() {
             </p>
           )}
 
+          {progress && (
+            <p className="mt-4 flex items-center gap-2 text-data-sm text-ink-muted">
+              <Loader2 size={14} className="animate-spin" />
+              {progress}
+            </p>
+          )}
+
           <div className="mt-5 flex justify-end">
-            <Button onClick={handleImport}>
-  In Portfolio importieren
-</Button>
+            <Button onClick={handleImport} disabled={importing}>
+              {importing ? 'Importiere…' : 'In Portfolio importieren'}
+            </Button>
           </div>
         </GlassCard>
       )}
