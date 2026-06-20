@@ -27,24 +27,6 @@ export function calculatePortfolioScore(
   const insights: PortfolioScoreInsight[] = []
   const recommendations: PortfolioRecommendation[] = []
 
-  recommendations.push({
-  title: 'Krypto-Risiko senken',
-  priority: 'high',
-  message: 'Dein Portfolio ist stark von Krypto abhängig. Ein ETF- oder Cash-Anteil könnte die Schwankungen reduzieren.',
-})
-
-  recommendations.push({
-  title: 'Breitere Basis aufbauen',
-  priority: 'medium',
-  message: 'Ein breit gestreuter ETF kann helfen, dein Portfolio stabiler und weniger abhängig von Einzelpositionen zu machen.',
-})
-
-  recommendations.push({
-  title: 'Klumpenrisiko reduzieren',
-  priority: 'high',
-  message: 'Eine einzelne Position dominiert dein Portfolio. Prüfe, ob du neue Käufe stärker auf andere Assets verteilst.',
-})
-
   let score = 100
 
   if (totalValue < 100) {
@@ -53,6 +35,11 @@ export function calculatePortfolioScore(
       label: 'Portfolio-Größe',
       status: 'warning',
       message: `Dein Portfolio ist mit ${totalValue.toFixed(2)} € noch sehr klein. Die Analyse wird aussagekräftiger, sobald mehr Kapital investiert ist.`,
+    })
+    recommendations.push({
+      title: 'Portfolio weiter aufbauen',
+      priority: 'medium',
+      message: 'Dein Portfolio ist noch sehr klein. Regelmäßige Einzahlungen können helfen, die Analyse aussagekräftiger zu machen.',
     })
   } else if (totalValue < 1000) {
     score -= 8
@@ -76,12 +63,22 @@ export function calculatePortfolioScore(
       status: 'bad',
       message: 'Dein Portfolio hat weniger als 3 aktive Positionen.',
     })
+    recommendations.push({
+      title: 'Mehr Positionen aufbauen',
+      priority: 'high',
+      message: 'Aktuell hängt dein Portfolio von wenigen Assets ab. Zusätzliche Positionen können dein Risiko besser verteilen.',
+    })
   } else if (openPositions.length < 6) {
     score -= 10
     insights.push({
       label: 'Diversifikation',
       status: 'warning',
       message: 'Mehr Positionen könnten dein Risiko besser verteilen.',
+    })
+    recommendations.push({
+      title: 'Diversifikation verbessern',
+      priority: 'medium',
+      message: 'Einige weitere Positionen können helfen, Schwankungen einzelner Assets besser auszugleichen.',
     })
   } else {
     insights.push({
@@ -94,8 +91,7 @@ export function calculatePortfolioScore(
   const largestPosition = openPositions[0]
 
   if (largestPosition && totalValue > 0) {
-    const largestPct =
-      (largestPosition.position.currentValue / totalValue) * 100
+    const largestPct = (largestPosition.position.currentValue / totalValue) * 100
 
     if (largestPct > 50) {
       score -= 25
@@ -104,12 +100,22 @@ export function calculatePortfolioScore(
         status: 'bad',
         message: `${largestPosition.asset.ticker} macht ${largestPct.toFixed(0)} % deines Portfolios aus.`,
       })
+      recommendations.push({
+        title: 'Klumpenrisiko reduzieren',
+        priority: 'high',
+        message: 'Eine einzelne Position dominiert dein Portfolio. Prüfe, ob du neue Käufe stärker auf andere Assets verteilst.',
+      })
     } else if (largestPct > 30) {
       score -= 12
       insights.push({
         label: 'Klumpenrisiko',
         status: 'warning',
         message: `${largestPosition.asset.ticker} ist mit ${largestPct.toFixed(0)} % sehr dominant.`,
+      })
+      recommendations.push({
+        title: 'Größte Position begrenzen',
+        priority: 'medium',
+        message: 'Deine größte Position ist sehr dominant. Neue Käufe könnten helfen, das Verhältnis auszugleichen.',
       })
     } else {
       insights.push({
@@ -133,12 +139,22 @@ export function calculatePortfolioScore(
       status: 'bad',
       message: `Krypto macht ${cryptoPct.toFixed(0)} % deines Portfolios aus. Das kann sehr volatil sein.`,
     })
+    recommendations.push({
+      title: 'Krypto-Risiko senken',
+      priority: 'high',
+      message: 'Dein Portfolio ist stark von Krypto abhängig. Ein ETF- oder Cash-Anteil könnte die Schwankungen reduzieren.',
+    })
   } else if (cryptoPct > 40) {
     score -= 10
     insights.push({
       label: 'Krypto-Gewichtung',
       status: 'warning',
       message: `Krypto macht ${cryptoPct.toFixed(0)} % deines Portfolios aus. Prüfe, ob das zu deinem Risiko passt.`,
+    })
+    recommendations.push({
+      title: 'Krypto-Anteil prüfen',
+      priority: 'medium',
+      message: 'Dein Krypto-Anteil ist hoch. Eine breitere Mischung kann dein Portfolio stabiler machen.',
     })
   } else {
     insights.push({
@@ -157,6 +173,11 @@ export function calculatePortfolioScore(
       status: 'warning',
       message: 'Du hast aktuell keinen ETF im Portfolio. ETFs können helfen, breiter zu diversifizieren.',
     })
+    recommendations.push({
+      title: 'Breitere Basis aufbauen',
+      priority: 'medium',
+      message: 'Ein breit gestreuter ETF kann helfen, dein Portfolio stabiler und weniger abhängig von Einzelpositionen zu machen.',
+    })
   } else if (hasEtf) {
     insights.push({
       label: 'ETF-Anteil',
@@ -165,9 +186,7 @@ export function calculatePortfolioScore(
     })
   }
 
-  const assetClasses = new Set(
-    openPositions.map((p) => p.asset.assetClass)
-  )
+  const assetClasses = new Set(openPositions.map((p) => p.asset.assetClass))
 
   if (assetClasses.size === 1) {
     score -= 18
@@ -175,6 +194,11 @@ export function calculatePortfolioScore(
       label: 'Asset-Mix',
       status: 'bad',
       message: 'Dein Portfolio besteht nur aus einer Asset-Klasse.',
+    })
+    recommendations.push({
+      title: 'Asset-Mix erweitern',
+      priority: 'high',
+      message: 'Dein Portfolio hängt stark an einer Asset-Klasse. Eine Mischung aus Aktien, ETFs, Cash oder Krypto kann helfen.',
     })
   } else if (assetClasses.size === 2) {
     score -= 8
@@ -204,6 +228,11 @@ export function calculatePortfolioScore(
       status: 'warning',
       message: `Deine Cashquote liegt bei ${cashPct.toFixed(0)} %. Zu viel Cash kann Rendite kosten.`,
     })
+    recommendations.push({
+      title: 'Cashquote prüfen',
+      priority: 'low',
+      message: 'Ein hoher Cash-Anteil reduziert Schwankungen, kann aber langfristig Rendite kosten.',
+    })
   } else {
     insights.push({
       label: 'Cashquote',
@@ -215,15 +244,16 @@ export function calculatePortfolioScore(
   const finalScore = Math.max(0, Math.min(100, Math.round(score)))
 
   return {
-  score: finalScore,
-  label:
-    finalScore >= 80
-      ? 'Stark'
-      : finalScore >= 60
-        ? 'Solide'
-        : finalScore >= 40
-          ? 'Ausbaufähig'
-          : 'Riskant',
-  insights,
-  recommendations,
+    score: finalScore,
+    label:
+      finalScore >= 80
+        ? 'Stark'
+        : finalScore >= 60
+          ? 'Solide'
+          : finalScore >= 40
+            ? 'Ausbaufähig'
+            : 'Riskant',
+    insights,
+    recommendations,
+  }
 }
