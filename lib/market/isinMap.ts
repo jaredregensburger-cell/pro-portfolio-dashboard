@@ -1,1 +1,4 @@
-
+const ISIN_TO_TICKER = {
+  US69608A1088: 'PLTR',
+  US6701002056: 'NVO',
+}
