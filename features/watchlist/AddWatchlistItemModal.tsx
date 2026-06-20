@@ -319,5 +319,5 @@ export function AddWatchlistItemModal() {
         </div>
       </form>
     </Modal>
-  )
+  ) 
 }
