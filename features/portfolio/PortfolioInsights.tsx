@@ -21,6 +21,12 @@ function getColor(status: 'good' | 'warning' | 'bad') {
   return 'text-loss'
 }
 
+function getPriorityLabel(priority: 'high' | 'medium' | 'low') {
+  if (priority === 'high') return 'Hoch'
+  if (priority === 'medium') return 'Mittel'
+  return 'Niedrig'
+}
+
 export function PortfolioInsights({ score }: PortfolioInsightsProps) {
   return (
     <GlassCard className="space-y-5">
@@ -78,15 +84,45 @@ export function PortfolioInsights({ score }: PortfolioInsightsProps) {
         })}
       </div>
 
+      {score.recommendations.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-data-sm font-semibold text-ink">
+            Konkrete Empfehlungen
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {score.recommendations.map((rec) => (
+              <div
+                key={rec.title}
+                className="rounded-xl border border-signal/20 bg-signal/10 p-4"
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-data-sm font-semibold text-ink">
+                    {rec.title}
+                  </p>
+
+                  <span className="rounded-full border border-border px-2 py-0.5 text-data-xs text-ink-muted">
+                    {getPriorityLabel(rec.priority)}
+                  </span>
+                </div>
+
+                <p className="text-data-sm text-ink-muted">
+                  {rec.message}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-signal/20 bg-signal/10 p-4">
         <p className="text-data-sm font-semibold text-ink">
-          Folio AI Empfehlung
+          Folio AI Pro
         </p>
 
         <p className="mt-1 text-data-sm text-ink-muted">
-          Als Nächstes kann Folio dir konkrete Vorschläge zeigen, wie du deinen
-          Score verbessern kannst — inklusive Risiko, Diversifikation und
-          Rebalancing.
+          Bald kann Folio dir konkrete Rebalancing-Vorschläge, Risiko-Simulationen
+          und Portfolio-Verbesserungen mit geschätztem Score-Impact anzeigen.
         </p>
       </div>
     </GlassCard>
