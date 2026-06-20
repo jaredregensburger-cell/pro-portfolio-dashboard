@@ -173,8 +173,24 @@ export function DashboardShell() {
           </div>
         </GlassCard>
 
-        <PerformerCard label="Best Asset" icon={Trophy} ranked={analytics.bestAsset} accent="gain" />
-        <PerformerCard label="Worst Asset" icon={TrendingDown} ranked={analytics.worstAsset} accent="loss" />
+        <GlassCard accent="signal" className="space-y-3">
+  <p className="text-data-sm text-ink-muted font-medium tracking-wide uppercase">
+    Folio AI Score
+  </p>
+
+  <div className="flex items-end gap-2">
+    <p className="font-mono text-data-3xl font-semibold text-ink">
+      {portfolioScore.score}
+    </p>
+    <p className="pb-1 text-data-sm text-ink-muted">/100</p>
+  </div>
+
+  <p className="text-data-sm text-ink-muted">
+    {portfolioScore.label}
+  </p>
+</GlassCard>
+
+<PerformerCard label="Best Asset" icon={Trophy} ranked={analytics.bestAsset} accent="gain" />
       </div>
 
       <GlassCard padding="none" className="overflow-hidden">
