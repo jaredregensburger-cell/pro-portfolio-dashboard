@@ -1,5 +1,6 @@
 'use client'
 
+import { calculatePortfolioScore } from '@/features/portfolio/portfolioScore'
 import { GlassCard, StatCard, TimeRangeSelector, EmptyState, SkeletonCard, SkeletonTable } from '@/components/ui'
 import { PortfolioValueChart } from '@/components/charts'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
