@@ -1,9 +1,10 @@
 'use client'
 
 import { GlassCard, Badge, EmptyState, Button, SkeletonTable } from '@/components/ui'
-import { useModalStore, useSimulationStore, useUIStore } from '@/store'
+import { useModalStore, useUIStore } from '@/store'
 import { showInfoToast } from '@/store/toast.store'
 import { useActivePortfolioData } from '@/features/portfolio/useActivePortfolioData'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { formatCurrency, formatNumber, formatDate, cn } from '@/lib/utils'
 import {
   ArrowDownLeft,
@@ -14,10 +15,44 @@ import {
 } from 'lucide-react'
 
 export function TransactionsShell() {
-  const { assets, transactions, hasHydrated } = useActivePortfolioData()
+  const { assets, transactions, hasHydrated, reload } = useActivePortfolioData()
   const currency = useUIStore((s) => s.currency)
-  const removeTransaction = useSimulationStore((s) => s.removeTransaction)
   const openModal = useModalStore((s) => s.openModal)
+
+  async function removeTransactionFromSupabase(
+    transactionId: string,
+    label: string
+  ) {
+    const confirmed = window.confirm('Diese Transaktion wirklich löschen?')
+    if (!confirmed) return
+
+    try {
+      const supabase = createSupabaseBrowserClient()
+
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId)
+
+      if (error) throw error
+
+      showInfoToast(
+        'Transaktion gelöscht',
+        `${label} wurde entfernt.`
+      )
+
+      window.dispatchEvent(new Event('folio:portfolio-changed'))
+      await reload()
+    } catch (err) {
+      console.error('Delete transaction error:', err)
+      showInfoToast(
+        'Löschen fehlgeschlagen',
+        err instanceof Error
+          ? err.message
+          : 'Transaktion konnte nicht gelöscht werden.'
+      )
+    }
+  }
 
   if (!hasHydrated) {
     return <SkeletonTable rows={6} />
@@ -80,6 +115,7 @@ export function TransactionsShell() {
             const asset = assets.find((a) => a.id === tx.assetId)
             const isBuy = tx.type === 'buy'
             const total = tx.quantity * tx.price
+            const label = `${isBuy ? 'Kauf' : 'Verkauf'} von ${asset?.ticker ?? 'Asset'}`
 
             return (
               <div
@@ -117,7 +153,10 @@ export function TransactionsShell() {
 
                 <div className="hidden md:block text-right w-24">
                   <p className="font-mono text-data-sm text-ink-muted">
-                    {formatNumber(tx.quantity, 4)}
+                    {formatNumber(
+                      tx.quantity,
+                      asset?.assetClass === 'crypto' ? 8 : 4
+                    )}
                   </p>
                 </div>
 
@@ -155,13 +194,7 @@ export function TransactionsShell() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      removeTransaction(tx.id)
-                      showInfoToast(
-                        'Transaktion gelöscht',
-                        `${isBuy ? 'Kauf' : 'Verkauf'} von ${asset?.ticker ?? 'Asset'} entfernt.`
-                      )
-                    }}
+                    onClick={() => removeTransactionFromSupabase(tx.id, label)}
                     title="Transaktion löschen"
                     className="opacity-0 group-hover:opacity-100 hover:text-loss"
                   >
